@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# JavaScript / Node
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.env
+.env.local
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Rust
+target/
+
+# Go
+*.exe
+*.test
+vendor/
