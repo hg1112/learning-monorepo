@@ -1,0 +1,3 @@
+# Root BUILD file — intentionally minimal.
+# Each project under apps/, experiments/, challenges/, shared/
+# defines its own BUILD.bazel targets.

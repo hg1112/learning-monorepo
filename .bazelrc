@@ -1,0 +1,13 @@
+# Common Bazel flags
+
+# Enable Bzlmod (default in Bazel 7, explicit for clarity)
+common --enable_bzlmod
+
+# Use a local disk cache to speed up rebuilds
+build --disk_cache=~/.cache/bazel-disk
+
+# Show test output on failure
+test --test_output=errors
+
+# Improve error output
+build --verbose_failures

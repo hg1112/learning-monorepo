@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A personal learning monorepo for projects, experiments, and coding challenges across different technologies. No shared build tooling — each project is self-contained and uses whatever stack it needs.
+A personal learning monorepo for projects, experiments, and coding challenges across different technologies. Uses **Bazel** as the shared build system (Bzlmod, Bazel 7+), with each project self-contained in its own subdirectory.
 
 ## Directory Structure
 
@@ -14,9 +14,48 @@ experiments/  # Quick explorations and proof-of-concepts
 challenges/   # Coding challenges (LeetCode, system design, etc.)
 shared/       # Reusable code shared across projects
 docs/         # Notes, write-ups, learnings
+  system_design/  # System design write-ups (e.g. rate_limiter)
 ```
 
-Each project lives in its own subdirectory and is fully independent. Follow the conventions of the language/framework used within that project.
+Each project lives in its own subdirectory with its own `BUILD.bazel`. Follow the conventions of the language/framework used within that project.
+
+## Build System — Bazel
+
+Bazel version is pinned in `.bazelversion` (currently 7.4.1). Configuration is in `.bazelrc`.
+
+**Install Bazel via Bazelisk** (recommended — auto-reads `.bazelversion`):
+
+```bash
+go install github.com/bazelbuild/bazelisk@latest
+export PATH=$PATH:$(go env GOPATH)/bin
+# or via npm:
+npm install -g @bazel/bazelisk
+```
+
+**Common commands:**
+
+```bash
+bazel build //...          # build everything
+bazel test //...           # run all tests
+bazel build //apps/foo:bin # build a specific target
+bazel query //...          # list all targets
+```
+
+**Language rules included in `MODULE.bazel`:**
+
+| Language | Rules |
+|----------|-------|
+| Python   | `rules_python` (Python 3.12) |
+| Go       | `rules_go` + `gazelle` |
+| Rust     | `rules_rust` |
+
+Add more language rules to `MODULE.bazel` as new projects require them.
+
+**Adding a new project:**
+
+1. Create the project directory under the appropriate top-level folder.
+2. Add a `BUILD.bazel` file with the relevant targets.
+3. For Go projects, run `gazelle` to auto-generate BUILD files: `bazel run //:gazelle`.
 
 ## Editor
 

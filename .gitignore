@@ -32,3 +32,6 @@ target/
 *.exe
 *.test
 vendor/
+
+# Bazel
+bazel-*
