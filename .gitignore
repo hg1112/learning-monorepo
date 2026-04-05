@@ -35,3 +35,6 @@ vendor/
 
 # Bazel
 bazel-*
+
+# Personal / untracked docs
+docs/career/
