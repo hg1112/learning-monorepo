@@ -1,0 +1,15 @@
+### Simple Request
+
+GET http://localhost:8080/books HTTP/1.1
+
+
+### Create new book
+
+POST http://localhost:8080/books HTTP/1.1
+Content-Type: application/json
+
+{
+	"id": "3", 
+	"title": "Dune", 
+	"author": "Frank Herbert"
+}
