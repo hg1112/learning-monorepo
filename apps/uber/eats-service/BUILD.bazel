@@ -1,0 +1,21 @@
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+
+java_library(
+    name = "eats_lib",
+    srcs = glob(["src/main/java/**/*.java"]),
+    resources = glob(["src/main/resources/**"]),
+    deps = [
+        "@maven//:org_springframework_boot_spring_boot_starter_web",
+        "@maven//:org_springframework_boot_spring_boot_starter_data_mongodb",
+        "@maven//:org_springframework_kafka_spring_kafka",
+        "@maven//:com_amazonaws_aws_java_sdk_s3",
+        "@maven//:com_amazonaws_aws_java_sdk_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+    ],
+)
+
+java_binary(
+    name = "eats-service",
+    main_class = "com.uber.eats.EatsServiceApplication",
+    runtime_deps = [":eats_lib"],
+)
