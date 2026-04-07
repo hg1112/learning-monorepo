@@ -78,3 +78,98 @@ graph TD
     SyncWorker -->|Redis Pub/Sub| AppServer
     AppServer -->|Evict Key| L1
 ```
+
+---
+
+## Tradeoff Summary
+
+| Decision | Chosen | Rejected | Why |
+|----------|--------|----------|-----|
+| Cache pattern | Cache-Aside → L1 + L2 + CDC | Write-Through with app-level invalidation | App-level invalidation creates dual-write bugs. CDC reads WAL at disk level — no app code can bypass it. |
+| Hot Key solution | L1 in-process cache (Caffeine) | Redis key sharding / local proxy | Redis still gets one request per L1 miss. L1 absorbs 99.9% of hits locally. One network call per L1 population, then zero. |
+| Stampede protection | XFetch probabilistic early expiration | Distributed lock (mutex) | Lock: one thread blocks Postgres, 9999 sleep. Lock failure/deadlock = outage. XFetch: stateless math, no coordination needed, background preload before TTL. |
+| Invalidation | Debezium CDC → Kafka → Redis Pub/Sub | App `DEL key` after DB write | App-level: crashes between write and DEL = stale cache. CDC: triggered by WAL change, cannot be bypassed by any code path. |
+
+---
+
+## Redis vs Memcached — When to Use Each
+
+### Feature Comparison
+
+| Feature | Redis | Memcached |
+|---------|-------|-----------|
+| Data structures | String, Hash, List, Set, SortedSet, Stream, Geo, BitMap, HyperLogLog | String (byte array) only |
+| Max value size | 512MB | 1MB |
+| Persistence | RDB snapshots + AOF append log | None — pure cache, RAM only |
+| Replication | Built-in (replica + Sentinel + Cluster) | None built-in (client-side sharding) |
+| Pub/Sub | Yes (SUBSCRIBE/PUBLISH) | No |
+| Lua scripting | Yes (atomic multi-command scripts) | No |
+| Transactions | Yes (MULTI/EXEC, watch) | No |
+| Threading model | Single-threaded command execution (I/O threads separate since 6.0) | Multi-threaded |
+| Throughput (single node) | ~100K ops/sec (single command thread) | ~500K ops/sec (multi-thread, GET/SET only) |
+| Memory efficiency | Lower (metadata per key + encoding overhead) | Higher (simple slab allocator, less overhead) |
+| Cluster scaling | Redis Cluster (16384 hash slots, automatic resharding) | Client-side consistent hashing only |
+| Operational complexity | Medium (Sentinel or Cluster mode) | Low (homogeneous, stateless nodes) |
+
+### When to use Memcached
+
+**Use Memcached when ALL of these are true:**
+1. Your cached values are simple strings or blobs (HTML fragments, serialized objects, API responses)
+2. You need maximum raw GET/SET throughput at the lowest cost
+3. You do NOT need: persistence, pub/sub, sorted sets, geo, Lua scripts, or transactions
+4. Your objects are < 1MB each
+5. Cache-only use case — if it disappears, you just repopulate from the source
+
+**Concrete Memcached use cases:**
+- **HTML fragment caching**: Cache rendered partial HTML for the top of a news feed. Simple string, evict-and-regenerate on miss. Throughput matters; data structures don't.
+- **API response caching at the edge**: A CDN node caches `GET /products/123` responses. The value is a serialized JSON blob. No need for sorted sets.
+- **Session token lookup**: `session_token → user_id` mapping. Pure string-to-string. High read throughput, simple value. Memcached's multi-threaded architecture handles 500K lookups/sec per node.
+- **Database query result cache**: Cache `SELECT * FROM products WHERE category='phones'` result as a blob. Simple cache-aside pattern, no data structure operations needed.
+
+**The core Memcached advantage: multi-threading.**
+Memcached uses multiple threads for request processing. At 32 CPU cores, Memcached can use all 32 for GET/SET handling. Redis uses one thread (+ I/O threads since 6.0 for network, but one thread for command execution). If you're doing billions of simple GET/SET operations and hitting Redis CPU limits before memory limits, Memcached's multi-threading gets more throughput per dollar.
+
+### When to use Redis
+
+**Use Redis when you need ANY of these:**
+- Data structures beyond strings (sorted sets for leaderboards, geo for location, sets for unique visitors)
+- Persistence (can't afford to lose the data if the node restarts)
+- Pub/Sub for real-time messaging between services
+- Lua scripts for atomic compound operations (budget enforcement, rate limiting)
+- WATCH-based transactions (optimistic locking)
+- Streams (Kafka-lite for lightweight event streaming)
+- Objects > 1MB
+
+**Concrete Redis use cases (each requiring a feature Memcached lacks):**
+
+| Use case | Redis feature used | Why Memcached can't |
+|----------|-------------------|---------------------|
+| Leaderboard (top 100 drivers by earnings) | `ZADD`/`ZRANGE` SortedSet | No sorted set |
+| Nearby driver search | `GEOADD`/`GEORADIUS` | No geo index |
+| Atomic budget enforcement | Lua script (INCR + compare) | No Lua |
+| Unique visitor count (HyperLogLog) | `PFADD`/`PFCOUNT` | No HyperLogLog |
+| Rate limiting (sliding window) | `ZADD` + `ZREMRANGEBYSCORE` | No sorted set |
+| Cache invalidation broadcast | `PUBLISH`/`SUBSCRIBE` | No Pub/Sub |
+| Distributed lock | `SET key val NX PX 5000` | Available but SETNX is not atomic with TTL in Memcached |
+| Session store that survives restart | AOF persistence | No persistence |
+
+### For Uber specifically
+
+Every Uber service uses Redis, not Memcached:
+- **Location service**: `GEOADD`/`GEORADIUS` — impossible in Memcached
+- **Budget counters**: Lua atomic increment — impossible in Memcached
+- **Rate limiting (API Gateway)**: sliding window via SortedSet — impossible in Memcached
+- **Campaign invalidation**: Pub/Sub broadcast — impossible in Memcached
+- **L1 cache invalidation**: Pub/Sub — impossible in Memcached
+
+The only theoretical place Memcached would win at Uber is pure HTML/API response caching on the CDN edge, and CDNs have their own purpose-built caching (Varnish, Nginx). For everything behind the CDN, Redis's data structures are too valuable to give up.
+
+### Dragonfly: the third option
+
+Dragonfly is a Redis-compatible server (same protocol, same commands) designed for modern multi-core servers:
+- Processes commands on multiple threads via a "shared-nothing" architecture
+- Claims 25x higher throughput than Redis on the same hardware
+- When to consider: you've hit single Redis node CPU limits and don't want to shard
+
+Dragonfly is very new (2022). For learning, use Redis. For production at extreme scale (>5M ops/sec single node), benchmark Dragonfly.
+
