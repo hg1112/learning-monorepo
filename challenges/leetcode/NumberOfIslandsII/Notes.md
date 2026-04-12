@@ -63,6 +63,57 @@ If the grid is truly massive (e.g., $10^9 \times 10^9$) but operations are few, 
 3.  Use `int[]` arrays for Union-Find.
 This is faster than `HashMap` due to lack of boxing and better cache locality.
 
+### Sparse Storage Visualization
+Instead of a dense 2D grid, we only store "active" land cells in a Map.
+
+```mermaid
+graph TD
+    subgraph "Grid (10,000 x 10,000)"
+    A["(0,0) - Water"]
+    B["(0,1) - Land (ID: 1)"]
+    C["(1,2) - Land (ID: 10002)"]
+    D["..."]
+    end
+
+    subgraph "Sparse Map (Memory Efficient)"
+    M["Map<ID, ParentID>"]
+    M1["1 -> 1"]
+    M2["10002 -> 10002"]
+    end
+
+    B -.-> M1
+    C -.-> M2
+```
+
+---
+
+### Union-Find Operations
+
+**1. Union by Rank (Keep Tree Shallow)**
+When merging two islands, the "shorter" tree always hangs under the "taller" one.
+```text
+   Root A (Rank 2)          Root B (Rank 1)
+      /   \                    |
+     C     D         +         E          ==>      Root A (Rank 2)
+                                                  /   |   \
+                                                 C    D    Root B
+                                                            |
+                                                            E
+```
+
+**2. Path Compression (Flattening)**
+Every time we `find(X)`, we point `X` and all its ancestors directly to the root.
+```text
+Before find(E):             After find(E):
+      Root                        Root
+       |                         / | \
+       A                        A  C  E
+       |
+       C
+       |
+       E
+```
+
 ---
 
 ## Complexity

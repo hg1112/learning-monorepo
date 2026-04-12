@@ -19,39 +19,68 @@ The current implementation uses binary search to find the maximum possible subar
     -   Binary Search: $O(\log N)$ steps.
     -   `check()` method: $O(N \log N)$ (each map operation is $\log N$).
     -   **Total Time**: $O(N \log^2 N)$.
--   **Pros**:
-    -   Logically straightforward (search for the answer).
--   **Cons**:
-    -   **Slow**: $O(N \log^2 N)$ is much slower than $O(N)$.
-    -   **Overhead**: `TreeMap` in Java has significant object creation overhead.
-    -   **Unnecessary Complexity**: Binary search is not needed for a sliding window problem.
 
 ---
 
 ## Optimized Strategy: Monotonic Deques
 
-Instead of binary searching, we use a single-pass sliding window with two monotonic deques to track the minimum and maximum in the current window in $O(1)$ amortized time.
-
 ### Key Insight
 A subarray satisfies the condition if `max(window) - min(window) <= limit`.
-1.  **`maxDeque`**: Stores indices of elements in decreasing order. `peekFirst()` is the window's maximum.
-2.  **`minDeque`**: Stores indices of elements in increasing order. `peekFirst()` is the window's minimum.
+We use two monotonic deques to track the min and max in $O(1)$ amortized time.
 
-### Algorithm
-1.  Iterate `right` from `0` to `n-1`.
-2.  Add `nums[right]` to both deques, maintaining their monotonic properties.
-3.  If `maxDeque.peekFirst() - minDeque.peekFirst() > limit`:
-    -   Increment `left`.
-    -   Remove `left-1` from deques if it was the current min or max.
-4.  Track the maximum `right - left + 1`.
+### Visualizing the Deques
+Example: `nums = [8, 2, 4, 7], limit = 4`
 
-### Complexity
--   **Time**: $O(N)$ (each element is added and removed from each deque at most once).
--   **Space**: $O(N)$ for the deques.
+```text
+1. Right = 0 (val: 8)
+   maxDeque: [8]
+   minDeque: [8]
+   Window [8], diff 0 <= 4. MaxLen: 1
+
+2. Right = 1 (val: 2)
+   maxDeque: [8, 2]
+   minDeque: [2] (8 removed because 2 < 8)
+   Window [8, 2], diff 6 > 4. 
+   -> SHRINK LEFT: remove 8 from maxDeque. Left = 1.
+   Window [2], diff 0 <= 4. MaxLen: 1
+
+3. Right = 2 (val: 4)
+   maxDeque: [4] (2 removed because 4 > 2)
+   minDeque: [2, 4]
+   Window [2, 4], diff 2 <= 4. MaxLen: 2
+
+4. Right = 3 (val: 7)
+   maxDeque: [7] (4 removed because 7 > 4)
+   minDeque: [2, 4, 7]
+   Window [2, 4, 7], diff 5 > 4.
+   -> SHRINK LEFT: remove 2 from minDeque. Left = 2.
+   Window [4, 7], diff 3 <= 4. MaxLen: 2
+```
 
 ---
 
-## Comparison Table
+### Sliding Window Mechanics
+
+```mermaid
+graph LR
+    subgraph "Sliding Window [L...R]"
+    L["Left Pointer"]
+    R["Right Pointer"]
+    W["[8, 2, 4, 7]"]
+    end
+
+    subgraph "Deques (Tracking extremes)"
+    D1["maxDeque (Decreasing)"]
+    D2["minDeque (Increasing)"]
+    end
+
+    W --> D1
+    W --> D2
+```
+
+---
+
+## Complexity
 
 | Approach | Time Complexity | Space Complexity | Note |
 | :--- | :--- | :--- | :--- |

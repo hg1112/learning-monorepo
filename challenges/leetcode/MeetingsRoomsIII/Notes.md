@@ -27,22 +27,48 @@ We need to efficiently track two things:
 -   **`freeRooms` (PriorityQueue<Integer>):** Stores indices of available rooms. Sorted by **index**.
 -   **`occupiedRooms` (PriorityQueue<long[]>):** Stores `[endTime, roomIndex]` of meetings in progress. Sorted by **endTime**, then **roomIndex**.
 
-### Steps
-1.  **Sort Meetings:** Sort by `start` time.
-2.  **For each meeting `[start, end]`:**
-    -   Free up all rooms in `occupiedRooms` whose `endTime <= start`. Move their indices to `freeRooms`.
-    -   **Case A: A room is available.**
-        -   Pick the lowest index from `freeRooms`.
-        -   Start the meeting at `start` and end at `end`.
-    -   **Case B: No rooms are available.**
-        -   Wait for the earliest room in `occupiedRooms` to finish.
-        -   The room's new `endTime` becomes `earliestEndTime + duration`.
-        -   The room index remains the same.
-    -   **Update Count:** Increment the meeting count for the chosen room.
+### Two Heaps Visualization
 
-3.  **Find Result:** Iterate through the count array and return the index with the maximum count.
+```mermaid
+graph LR
+    subgraph "Available Rooms (freeRooms)"
+    R0["Room 0"]
+    R1["Room 1"]
+    R2["Room 2"]
+    end
 
-### Complexity
+    subgraph "Active Meetings (occupiedRooms)"
+    O1["[End: 10, Room 3]"]
+    O2["[End: 15, Room 4]"]
+    end
+
+    M["New Meeting [Start: 5, End: 12]"]
+    M -->|"Check freeRooms"| R0["Room 0 (Lowest Index)"]
+```
+
+---
+
+### Delayed Meeting Scenario
+
+**What happens when all rooms are busy?**
+
+```text
+Time Line: -------------------------------------->
+[Room 0] |===== M1 [Ends at 10] =====|
+[Room 1] |===== M2 [Ends at 15] =====|
+
+New Meeting M3 starts at 5, duration 10.
+- All rooms busy at t=5.
+- Earliest room is [Room 0] at t=10.
+- Delay M3: New start = 10, New end = 10 + 10 = 20.
+
+[Room 0] |===== M1 =====| . . . |===== M3 [Ends at 20] =====|
+                                 ^ delayed
+```
+
+---
+
+## Complexity
 -   **Time:** $O(M \log M + M \log N)$ where $M$ is the number of meetings and $N$ is the number of rooms.
 -   **Space:** $O(N)$ to store room information and counts.
 
