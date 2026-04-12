@@ -19,6 +19,39 @@ Searching for X = 7 in [1, 3, 5, 7, 9, 11]
              mid = 7 -> Found!
 ```
 
+### Iterative Implementation
+The standard and most memory-efficient way using a `while` loop.
+
+```java
+public int binarySearchIterative(int[] nums, int target) {
+    int lo = 0, hi = nums.length - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (nums[mid] == target) return mid;
+        if (nums[mid] < target) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
+}
+```
+
+### Recursive Implementation
+Uses the call stack to manage the search space. Useful for divide-and-conquer logic.
+
+```java
+public int binarySearchRecursive(int[] nums, int target, int lo, int hi) {
+    if (lo > hi) return -1;
+    
+    int mid = lo + (hi - lo) / 2;
+    if (nums[mid] == target) return mid;
+    
+    if (nums[mid] < target) 
+        return binarySearchRecursive(nums, target, mid + 1, hi);
+    else 
+        return binarySearchRecursive(nums, target, lo, mid - 1);
+}
+```
+
 ---
 
 ## Binary Search on Answer
