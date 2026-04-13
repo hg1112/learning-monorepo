@@ -974,17 +974,25 @@ curl -X POST http://localhost:8082/api/ads \
   -H "Content-Type: application/json" \
   -d '{"advertiserId":1,"campaignId":1,"title":"Best Pizza in Town","status":"ACTIVE"}'
 
-# Verify Kafka received ad-created-events
-docker exec -it uber-kafka kafka-console-consumer.sh \
+# Verify Kafka topics exist (broker command)
+kafka-topics.sh --list --bootstrap-server localhost:9092
+
+# Manually produce a test event (producer command)
+# (Type your message and press Enter, then Ctrl+C to exit)
+kafka-console-producer.sh --bootstrap-server localhost:9092 --topic ad-created-events
+
+# Verify Kafka received ad-created-events (consumer command)
+kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 \
-  --topic ad-created-events --from-beginning
+  --topic ad-created-events --from-beginning --timeout-ms 10000
+
 
 # Switch cache strategy in application.properties and observe behaviour:
 #   campaign.cache.strategy=read-through
 # Rebuild and hit GET /api/ads/1 twice — second hit has no DB query in logs.
 
 # Observe Redis keys
-docker exec -it uber-redis redis-cli
+redis-cli
 > KEYS campaign:*
 > KEYS ad:*
 ```

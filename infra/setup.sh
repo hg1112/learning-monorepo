@@ -625,28 +625,34 @@ install_kafka() {
   sudo mv "/opt/kafka_${KAFKA_SCALA}-${KAFKA_VERSION}" /opt/kafka
   sudo rm -f "$tmp_tarball"
 
-  sudo ln -sf /opt/kafka/bin/kafka-topics.sh /usr/local/bin/kafka-topics.sh
-  sudo ln -sf /opt/kafka/bin/kafka-console-producer.sh /usr/local/bin/kafka-console-producer.sh
-  sudo ln -sf /opt/kafka/bin/kafka-console-consumer.sh /usr/local/bin/kafka-console-consumer.sh
+  # System-wide PATH for Kafka binaries
+  echo "export PATH=\$PATH:/opt/kafka/bin" | sudo tee /etc/profile.d/kafka.sh >/dev/null
+  export PATH=$PATH:/opt/kafka/bin
+
+  # Permanent log directory
+  sudo mkdir -p /var/lib/kafka-logs
+  sudo useradd -r -s /bin/false kafka 2>/dev/null || true
+  sudo chown -R kafka:kafka /var/lib/kafka-logs /opt/kafka
+
+  # Update log.dirs in server.properties to be persistent
+  sudo sed -i 's|log.dirs=.*|log.dirs=/var/lib/kafka-logs|' /opt/kafka/config/kraft/server.properties
 
   # KRaft setup
   if [[ ! -f /opt/kafka/config/kraft/server.properties.formatted ]]; then
     log_info "Formatting Kafka storage (KRaft mode)..."
     local uuid; uuid=$(/opt/kafka/bin/kafka-storage.sh random-uuid)
-    sudo /opt/kafka/bin/kafka-storage.sh format \
+    sudo -u kafka /opt/kafka/bin/kafka-storage.sh format \
       -t "$uuid" \
       -c /opt/kafka/config/kraft/server.properties
     sudo touch /opt/kafka/config/kraft/server.properties.formatted
   fi
 
   # Systemd unit
-  sudo useradd -r -s /bin/false kafka 2>/dev/null || true
-  sudo chown -R kafka:kafka /opt/kafka
   write_systemd_unit kafka "Apache Kafka" kafka \
     "/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties" \
     "/opt/kafka"
   sudo systemctl enable kafka
-  log_success "Kafka ${KAFKA_VERSION} installed"
+  log_success "Kafka ${KAFKA_VERSION} installed (active on :9092)"
 }
 
 install_rabbitmq() {
