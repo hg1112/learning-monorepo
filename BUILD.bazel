@@ -1,3 +1,8 @@
+load("@gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix learning-monorepo
+gazelle(name = "gazelle")
+
 # Root BUILD file — intentionally minimal.
 # Each project under apps/, experiments/, challenges/, shared/
 # defines its own BUILD.bazel targets.

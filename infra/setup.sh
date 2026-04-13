@@ -52,6 +52,7 @@ INSTALL_OLLAMA=false
 INSTALL_SPARK=false
 INSTALL_CUDA=false
 INSTALL_AI_STACK=false
+INSTALL_BAZEL=false
 
 # ─── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -88,6 +89,7 @@ ${BOLD}Dev toolchain flags:${NC}
   --go              Go (latest)
   --node            Node.js 20 LTS
   --rust            Rust via rustup
+  --bazel           Bazel build system
 
 ${BOLD}ML infra flags:${NC}
   --qdrant          Qdrant vector database            :6333
@@ -117,7 +119,7 @@ parse_args() {
       --all)
         for v in POSTGRES CASSANDRA REDIS MONGODB CLICKHOUSE ELASTICSEARCH \
                  KAFKA RABBITMQ MEMCACHED MINIO NGINX HAPROXY ENVOY KONG \
-                 PROMETHEUS GRAFANA JAEGER OTELCOL JAVA GO NODE RUST \
+                 PROMETHEUS GRAFANA JAEGER OTELCOL JAVA GO NODE RUST BAZEL \
                  QDRANT OLLAMA SPARK CUDA AI_STACK; do
           eval "INSTALL_${v}=true"
         done
@@ -144,6 +146,7 @@ parse_args() {
       --go)              INSTALL_GO=true;              _any_flag=true ;;
       --node)            INSTALL_NODE=true;            _any_flag=true ;;
       --rust)            INSTALL_RUST=true;            _any_flag=true ;;
+      --bazel)           INSTALL_BAZEL=true;           _any_flag=true ;;
       --qdrant)          INSTALL_QDRANT=true;          _any_flag=true ;;
       --ollama)          INSTALL_OLLAMA=true;          _any_flag=true ;;
       --spark)           INSTALL_SPARK=true;           _any_flag=true ;;
@@ -190,6 +193,7 @@ _whiptail_select() {
     "go"             "Go (latest)"                          OFF \
     "node"           "Node.js 20 LTS"                       OFF \
     "rust"           "Rust (rustup)"                        OFF \
+    "bazel"          "Bazel build system"                   OFF \
     "qdrant"         "Qdrant vector DB            :6333"    OFF \
     "ollama"         "Ollama LLM server           :11434"   OFF \
     "spark"          "Apache Spark ${SPARK_VERSION}        :8080"    OFF \
@@ -222,6 +226,7 @@ _whiptail_select() {
       go)            INSTALL_GO=true ;;
       node)          INSTALL_NODE=true ;;
       rust)          INSTALL_RUST=true ;;
+      bazel)         INSTALL_BAZEL=true ;;
       qdrant)        INSTALL_QDRANT=true ;;
       ollama)        INSTALL_OLLAMA=true ;;
       spark)         INSTALL_SPARK=true ;;
@@ -260,6 +265,7 @@ _prompt_select() {
   _ask "Go (latest)"                                    INSTALL_GO
   _ask "Node.js 20 LTS"                                 INSTALL_NODE
   _ask "Rust (rustup)"                                  INSTALL_RUST
+  _ask "Bazel build system"                             INSTALL_BAZEL
   _ask "Qdrant vector DB"                               INSTALL_QDRANT
   _ask "Ollama LLM server"                              INSTALL_OLLAMA
   _ask "Apache Spark ${SPARK_VERSION}"                  INSTALL_SPARK
@@ -385,10 +391,18 @@ _setup_repo_redis() {
 }
 
 _setup_repo_mongodb() {
-  [[ -f /etc/apt/sources.list.d/mongodb-org-7.0.list ]] && return
-  # MongoDB supports jammy and noble; fall back to noble for unknown codenames
+  local list_file="/etc/apt/sources.list.d/mongodb-org-7.0.list"
+  # Clean up existing list file if it's there
+  if [[ -f "$list_file" ]]; then
+    sudo rm -f "$list_file"
+  fi
+  # MongoDB 7.0 does NOT have a native 'noble' repo; fallback to 'jammy'
   local codename="$DISTRO_CODENAME"
-  [[ "$codename" != "jammy" && "$codename" != "noble" && "$codename" != "focal" ]] && codename="noble"
+  if [[ "$codename" == "noble" ]]; then
+    codename="jammy"
+    log_info "Ubuntu 24.04 (noble) detected for MongoDB 7.0; using jammy repository"
+  fi
+  [[ "$codename" != "jammy" && "$codename" != "focal" ]] && codename="jammy"
   add_apt_key mongodb-7 "https://pgp.mongodb.com/server-7.0.asc"
   add_apt_source mongodb-org-7.0 \
     "deb [arch=amd64,arm64 signed-by=${_keyring_dir}/mongodb-7.gpg] https://repo.mongodb.org/apt/ubuntu ${codename}/mongodb-org/7.0 multiverse"
@@ -412,7 +426,8 @@ _setup_repo_rabbitmq() {
   [[ -f /etc/apt/sources.list.d/rabbitmq.list ]] && return
   add_apt_key rabbitmq "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA"
   local codename="$DISTRO_CODENAME"
-  [[ "$codename" != "jammy" && "$codename" != "noble" ]] && codename="noble"
+  [[ "$codename" != "jammy" && "$codename" != "noble" ]] && codename="jammy"
+  # Note: if noble is still missing on some mirrors, jammy is a safer fallback
   add_apt_source rabbitmq \
     "deb [arch=amd64 signed-by=${_keyring_dir}/rabbitmq.gpg] https://deb1.rabbitmq.com/rabbitmq-erlang/ubuntu ${codename} ${codename} main
 deb [arch=amd64 signed-by=${_keyring_dir}/rabbitmq.gpg] https://deb1.rabbitmq.com/rabbitmq-server/ubuntu ${codename} ${codename} main"
@@ -440,6 +455,13 @@ _setup_repo_kong() {
   [[ "$codename" != "noble" && "$codename" != "jammy" ]] && codename="noble"
   add_apt_source kong \
     "deb [arch=amd64 signed-by=${_keyring_dir}/kong.gpg] https://packages.konghq.com/public/gateway-39/deb/ubuntu ${codename} main"
+}
+
+_setup_repo_bazel() {
+  [[ -f /etc/apt/sources.list.d/bazel.list ]] && return
+  add_apt_key bazel "https://bazel.build/bazel-release.pub.gpg"
+  add_apt_source bazel \
+    "deb [arch=amd64 signed-by=${_keyring_dir}/bazel.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8"
 }
 
 _setup_repo_grafana() {
@@ -483,6 +505,7 @@ setup_repos() {
   $INSTALL_ENVOY         && _setup_repo_envoy
   $INSTALL_KONG          && _setup_repo_kong
   $INSTALL_GRAFANA       && _setup_repo_grafana
+  $INSTALL_BAZEL         && _setup_repo_bazel
   $INSTALL_NODE          && _setup_repo_nodesource
   $INSTALL_CUDA          && _gpu_present && _setup_repo_cuda
   sudo apt-get update -qq
@@ -550,24 +573,71 @@ install_elasticsearch() {
   log_warn "Initial elastic password is shown once during first 'systemctl start elasticsearch'."
 }
 
+# ─── Mise detection ───────────────────────────────────────────────────────────
+_get_mise_bin() {
+  if command -v mise &>/dev/null; then
+    command -v mise
+  elif [[ -x "$HOME/.local/bin/mise" ]]; then
+    echo "$HOME/.local/bin/mise"
+  elif [[ -n "${SUDO_USER:-}" ]] && [[ -x "/home/$SUDO_USER/.local/bin/mise" ]]; then
+    echo "/home/$SUDO_USER/.local/bin/mise"
+  elif [[ -x "/usr/local/bin/mise" ]]; then
+    echo "/usr/local/bin/mise"
+  else
+    return 1
+  fi
+}
+
 install_kafka() {
   [[ -d /opt/kafka ]] && { log_warn "Kafka already installed at /opt/kafka, skipping"; return; }
-  log_info "Installing Kafka ${KAFKA_VERSION} (KRaft mode, no Zookeeper)..."
+  log_info "Installing Kafka ${KAFKA_VERSION}..."
+  
+  # Java is mandatory
   command -v java &>/dev/null || sudo apt-get install -y -qq openjdk-21-jre-headless
+
   local tarball="kafka_${KAFKA_SCALA}-${KAFKA_VERSION}.tgz"
-  local url="https://downloads.apache.org/kafka/${KAFKA_VERSION}/${tarball}"
-  wget -qO "/tmp/${tarball}" "$url"
-  sudo tar -xzf "/tmp/${tarball}" -C /opt
+  local tmp_tarball="/tmp/${tarball}"
+  
+  # Try multiple mirror patterns
+  local urls=(
+    "https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/${tarball}"
+    "https://downloads.apache.org/kafka/${KAFKA_VERSION}/${tarball}"
+  )
+
+  sudo rm -f "$tmp_tarball"
+  local downloaded=false
+  for url in "${urls[@]}"; do
+    log_info "Trying to download Kafka from: $url"
+    if sudo wget -qO "$tmp_tarball" "$url"; then
+      downloaded=true
+      break
+    fi
+  done
+
+  if [[ "$downloaded" == "false" ]]; then
+    log_error "Failed to download Kafka ${KAFKA_VERSION} from all sources."
+    return 1
+  fi
+
+  sudo mkdir -p /opt/kafka
+  sudo tar -xzf "$tmp_tarball" -C /opt
+  sudo rm -rf /opt/kafka
   sudo mv "/opt/kafka_${KAFKA_SCALA}-${KAFKA_VERSION}" /opt/kafka
+  sudo rm -f "$tmp_tarball"
+
   sudo ln -sf /opt/kafka/bin/kafka-topics.sh /usr/local/bin/kafka-topics.sh
   sudo ln -sf /opt/kafka/bin/kafka-console-producer.sh /usr/local/bin/kafka-console-producer.sh
   sudo ln -sf /opt/kafka/bin/kafka-console-consumer.sh /usr/local/bin/kafka-console-consumer.sh
 
   # KRaft setup
-  local uuid; uuid=$(/opt/kafka/bin/kafka-storage.sh random-uuid)
-  sudo /opt/kafka/bin/kafka-storage.sh format \
-    -t "$uuid" \
-    -c /opt/kafka/config/kraft/server.properties
+  if [[ ! -f /opt/kafka/config/kraft/server.properties.formatted ]]; then
+    log_info "Formatting Kafka storage (KRaft mode)..."
+    local uuid; uuid=$(/opt/kafka/bin/kafka-storage.sh random-uuid)
+    sudo /opt/kafka/bin/kafka-storage.sh format \
+      -t "$uuid" \
+      -c /opt/kafka/config/kraft/server.properties
+    sudo touch /opt/kafka/config/kraft/server.properties.formatted
+  fi
 
   # Systemd unit
   sudo useradd -r -s /bin/false kafka 2>/dev/null || true
@@ -576,7 +646,7 @@ install_kafka() {
     "/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties" \
     "/opt/kafka"
   sudo systemctl enable kafka
-  log_success "Kafka ${KAFKA_VERSION} installed (KRaft mode)"
+  log_success "Kafka ${KAFKA_VERSION} installed"
 }
 
 install_rabbitmq() {
@@ -802,6 +872,13 @@ install_rust() {
   log_success "Rust installed"
 }
 
+install_bazel() {
+  command -v bazel &>/dev/null && { log_warn "Bazel already installed, skipping"; return; }
+  log_info "Installing Bazel..."
+  sudo apt-get install -y -qq bazel
+  log_success "Bazel $(bazel --version) installed"
+}
+
 install_qdrant() {
   command -v qdrant &>/dev/null && { log_warn "Qdrant already installed, skipping"; return; }
   log_info "Installing Qdrant..."
@@ -948,37 +1025,40 @@ start_services() {
   _start() {
     local svc="$1"
     if systemctl list-unit-files "${svc}.service" &>/dev/null; then
-      sudo systemctl start "$svc" 2>/dev/null \
-        && log_success "Started: $svc" \
-        || log_warn "Could not start: $svc (check: journalctl -u $svc)"
+      if sudo systemctl start "$svc" 2>/dev/null; then
+        log_success "Started: $svc"
+      else
+        log_warn "Could not start: $svc (check: journalctl -u $svc)"
+      fi
     fi
   }
 
-  $INSTALL_POSTGRES      && _start postgresql
-  $INSTALL_REDIS         && _start redis-server
-  $INSTALL_MONGODB       && _start mongod
-  $INSTALL_CLICKHOUSE    && _start clickhouse-server
-  $INSTALL_ELASTICSEARCH && _start elasticsearch
-  $INSTALL_ELASTICSEARCH && _start kibana
-  $INSTALL_RABBITMQ      && _start rabbitmq-server
-  $INSTALL_MEMCACHED     && _start memcached
-  $INSTALL_MINIO         && _start minio
-  $INSTALL_NGINX         && _start nginx
-  $INSTALL_HAPROXY       && _start haproxy
-  $INSTALL_KONG          && _start kong
-  $INSTALL_PROMETHEUS    && _start prometheus
-  $INSTALL_GRAFANA       && _start grafana-server
-  $INSTALL_JAEGER        && _start jaeger
-  $INSTALL_OTELCOL       && _start otelcol
-  $INSTALL_QDRANT        && _start qdrant
-  $INSTALL_OLLAMA        && _start ollama
-  $INSTALL_KAFKA         && _start kafka
+  $INSTALL_POSTGRES      && _start postgresql || true
+  $INSTALL_REDIS         && _start redis-server || true
+  $INSTALL_MONGODB       && _start mongod || true
+  $INSTALL_CLICKHOUSE    && _start clickhouse-server || true
+  $INSTALL_ELASTICSEARCH && _start elasticsearch || true
+  $INSTALL_ELASTICSEARCH && _start kibana || true
+  $INSTALL_RABBITMQ      && _start rabbitmq-server || true
+  $INSTALL_MEMCACHED     && _start memcached || true
+  $INSTALL_MINIO         && _start minio || true
+  $INSTALL_NGINX         && _start nginx || true
+  $INSTALL_HAPROXY       && _start haproxy || true
+  $INSTALL_KONG          && _start kong || true
+  $INSTALL_PROMETHEUS    && _start prometheus || true
+  $INSTALL_GRAFANA       && _start grafana-server || true
+  $INSTALL_JAEGER        && _start jaeger || true
+  $INSTALL_OTELCOL       && _start otelcol || true
+  $INSTALL_QDRANT        && _start qdrant || true
+  $INSTALL_OLLAMA        && _start ollama || true
+  $INSTALL_KAFKA         && _start kafka || true
 
   # Cassandra is slow to start; note only
   $INSTALL_CASSANDRA && {
     sudo systemctl start cassandra 2>/dev/null || true
     log_info "Cassandra started (may take ~30s to become ready; check: nodetool status)"
   }
+  return 0
 }
 
 # ─── Summary table ────────────────────────────────────────────────────────────
@@ -997,6 +1077,7 @@ print_summary() {
     fi
     printf "%-22s %-8s %-22s " "$name" "$ports" "$url"
     echo -e "$status"
+    return 0
   }
 
   $INSTALL_POSTGRES      && _row "PostgreSQL ${POSTGRES_VERSION}"  "5432"       "localhost:5432"       postgresql
@@ -1025,6 +1106,7 @@ print_summary() {
   $INSTALL_GO      && log_success "Go:     $(go version 2>/dev/null || echo 'restart shell to use')"
   $INSTALL_NODE    && log_success "Node:   $(node --version 2>/dev/null)"
   $INSTALL_RUST    && log_success "Rust:   (restart shell, then: rustc --version)"
+  $INSTALL_BAZEL   && log_success "Bazel:  $(bazel --version 2>/dev/null | head -1)"
   $INSTALL_SPARK   && log_success "Spark:  ${SPARK_VERSION} at /opt/spark"
   $INSTALL_AI_STACK && log_success "AI env: conda activate dev"
 }
@@ -1047,39 +1129,42 @@ main() {
 
   section "Installing components"
 
-  $INSTALL_JAVA          && install_java          # first: many services need Java
-  $INSTALL_POSTGRES      && install_postgres
-  $INSTALL_CASSANDRA     && install_cassandra
-  $INSTALL_REDIS         && install_redis
-  $INSTALL_MONGODB       && install_mongodb
-  $INSTALL_CLICKHOUSE    && install_clickhouse
-  $INSTALL_ELASTICSEARCH && install_elasticsearch
-  $INSTALL_KAFKA         && install_kafka
-  $INSTALL_RABBITMQ      && install_rabbitmq
-  $INSTALL_MEMCACHED     && install_memcached
-  $INSTALL_MINIO         && install_minio
-  $INSTALL_NGINX         && install_nginx
-  $INSTALL_HAPROXY       && install_haproxy
-  $INSTALL_ENVOY         && install_envoy
-  $INSTALL_KONG          && install_kong
-  $INSTALL_PROMETHEUS    && install_prometheus
-  $INSTALL_GRAFANA       && install_grafana
-  $INSTALL_JAEGER        && install_jaeger
-  $INSTALL_OTELCOL       && install_otelcol
-  $INSTALL_GO            && install_go
-  $INSTALL_NODE          && install_node
-  $INSTALL_RUST          && install_rust
-  $INSTALL_QDRANT        && install_qdrant
-  $INSTALL_OLLAMA        && install_ollama
-  $INSTALL_SPARK         && install_spark
-  $INSTALL_CUDA          && install_cuda
-  $INSTALL_AI_STACK      && install_ai_stack
+  $INSTALL_JAVA          && install_java || true
+  $INSTALL_POSTGRES      && install_postgres || true
+  $INSTALL_CASSANDRA     && install_cassandra || true
+  $INSTALL_REDIS         && install_redis || true
+  $INSTALL_MONGODB       && install_mongodb || true
+  $INSTALL_CLICKHOUSE    && install_clickhouse || true
+  $INSTALL_ELASTICSEARCH && install_elasticsearch || true
+  $INSTALL_KAFKA         && install_kafka || true
+  $INSTALL_RABBITMQ      && install_rabbitmq || true
+  $INSTALL_MEMCACHED     && install_memcached || true
+  $INSTALL_MINIO         && install_minio || true
+  $INSTALL_NGINX         && install_nginx || true
+  $INSTALL_HAPROXY       && install_haproxy || true
+  $INSTALL_ENVOY         && install_envoy || true
+  $INSTALL_KONG          && install_kong || true
+  $INSTALL_PROMETHEUS    && install_prometheus || true
+  $INSTALL_GRAFANA       && install_grafana || true
+  $INSTALL_JAEGER        && install_jaeger || true
+  $INSTALL_OTELCOL       && install_otelcol || true
+  $INSTALL_GO            && install_go || true
+  $INSTALL_NODE          && install_node || true
+  $INSTALL_RUST          && install_rust || true
+  $INSTALL_BAZEL         && install_bazel || true
+  $INSTALL_QDRANT        && install_qdrant || true
+  $INSTALL_OLLAMA        && install_ollama || true
+  $INSTALL_SPARK         && install_spark || true
+  $INSTALL_CUDA          && install_cuda || true
+  $INSTALL_AI_STACK      && install_ai_stack || true
 
   start_services
-  print_summary
+
+  print_summary || true
 
   echo ""
   log_success "Setup complete! Log out and back in (or run: source /etc/profile.d/*.sh) to reload PATH."
+  return 0
 }
 
 main "$@"

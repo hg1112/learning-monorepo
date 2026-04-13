@@ -1,0 +1,22 @@
+# IntelliJ Bazel Plugin — Project View File
+# Docs: https://www.jetbrains.com/help/idea/bazel-project-view.html
+#
+# After editing this file: File → Sync Project with BUILD Files (or use the
+# "Sync" button in the Bazel toolbar) to re-index.
+
+directories:
+  apps/uber/eats-service
+  challenges/leetcode
+  shared/graphs
+
+derive_targets_from_directories: true
+
+# Java language level used for IntelliJ indexing and code insight.
+# Keep in sync with the JDK used by Bazel (currently JDK 26 via mise).
+java_language_level: 21
+
+# Pass JAVA_HOME into Bazel so local_jdk detection works regardless of
+# how IntelliJ launches Bazel (same fix as in .bazelrc).
+build_flags:
+  --repo_env=JAVA_HOME
+  --action_env=JAVA_HOME

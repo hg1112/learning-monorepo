@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A personal learning monorepo for projects, experiments, and coding challenges across different technologies. Uses **Bazel** as the shared build system (Bzlmod, Bazel 7+), with each project self-contained in its own subdirectory.
+A personal learning monorepo for projects, experiments, and coding challenges across different technologies.
+
+**Build systems:** This repo uses **Bazel** (canonical build, all languages) alongside **Maven** (IntelliJ IDE support for Java only). Read [`BUILD.md`](BUILD.md) before making any changes to build files, adding dependencies, or creating new services.
 
 ## Directory Structure
 
@@ -21,7 +23,7 @@ Each project lives in its own subdirectory with its own `BUILD.bazel`. Follow th
 
 ## Build System — Bazel
 
-Bazel version is pinned in `.bazelversion` (currently 7.4.1). Configuration is in `.bazelrc`.
+Bazel version is pinned in `.bazelversion` to 9.0.2. Configuration is in `.bazelrc`.
 
 **Install Bazel via Bazelisk** (recommended — auto-reads `.bazelversion`):
 
