@@ -173,3 +173,419 @@ Dragonfly is a Redis-compatible server (same protocol, same commands) designed f
 
 Dragonfly is very new (2022). For learning, use Redis. For production at extreme scale (>5M ops/sec single node), benchmark Dragonfly.
 
+---
+
+## Cache Invalidation Strategies
+
+> "There are only two hard things in Computer Science: cache invalidation and naming things." — Phil Karlton
+
+Invalidation is how the cache stays consistent with the database when data changes. Each strategy trades off consistency, latency, complexity, and failure risk differently.
+
+```
+  Overview of all strategies:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ Strategy          │ Who writes DB? │ Who writes cache? │ Consistency │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │ TTL expiration    │ App            │ App (on miss)      │ Eventual    │
+  │ Cache-aside       │ App            │ App (DELETE)       │ Near-real   │
+  │ Write-through     │ App (via cache)│ Cache layer        │ Strong      │
+  │ Write-behind      │ Cache (async)  │ App                │ Weak        │
+  │ Event-driven (CDC)│ App            │ Worker (from WAL)  │ Strong      │
+  │ Tag-based         │ App            │ App (tag evict)    │ Near-real   │
+  └─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Strategy 1: TTL Expiration (Passive)
+
+The simplest strategy — just let cache entries expire. No explicit invalidation code.
+
+```
+  Write path:
+  ┌─────┐  PUT /profile  ┌─────┐  UPDATE  ┌────────────┐
+  │ App │ ─────────────► │ App │ ────────► │  Postgres  │
+  └─────┘                └─────┘           └────────────┘
+                                           (cache NOT touched — stale until TTL)
+
+  Read path after TTL expires:
+  ┌─────┐  GET /profile  ┌─────┐  MISS  ┌───────┐  SELECT  ┌────────────┐
+  │ App │ ─────────────► │Redis│ ──────► │  App  │ ───────► │  Postgres  │
+  └─────┘                └─────┘         └───┬───┘          └─────┬──────┘
+                                             │   SET key TTL=60s   │
+                                             └─────────────────────┘
+
+  Redis key: user:123  →  expires after TTL  →  re-fetched on next miss
+```
+
+```java
+// Spring Cache with Redis — TTL configured via RedisCacheConfiguration
+@Cacheable(value = "users", key = "#id")
+public User getUser(Long id) {
+    return userRepository.findById(id).orElseThrow();
+}
+
+// RedisCacheConfiguration:
+RedisCacheConfiguration.defaultCacheConfig()
+    .entryTtl(Duration.ofMinutes(5))
+    .disableCachingNullValues();
+```
+
+**When to use:** Non-critical data where slight staleness is acceptable (product descriptions, public stats, exchange rates). Simplest to implement — zero invalidation code.
+
+**Failure modes:**
+- **Stale reads**: user sees old data for up to TTL duration after a write.
+- **Stampede on expiry**: all keys set at the same time expire together → thundering herd. Fix: add jitter (`TTL ± rand(30s)`).
+
+---
+
+### Strategy 2: Cache-Aside with Write-Invalidate (Delete-on-Write)
+
+The app explicitly deletes the cache key after writing to the DB. The next read repopulates.
+
+```
+  Write path:
+  ┌─────┐  PUT /profile  ┌─────────────────────────────────────┐
+  │ App │ ─────────────► │ 1. UPDATE users SET ... WHERE id=123 │
+  └─────┘                │ 2. DEL user:123 (if DB write succeeds)│
+                         └─────────────────────────────────────┘
+
+  Next read (cache miss):
+  Redis: MISS → SELECT FROM users → SET user:123 (fresh data) → return
+
+  ┌────────────────────────────────────────────────────────┐
+  │  Timeline:  write → DELETE → [miss window] → repopulate │
+  │  Staleness window: only the in-flight reads between     │
+  │  DELETE and the next SET (milliseconds)                 │
+  └────────────────────────────────────────────────────────┘
+```
+
+```java
+// Service layer — cache-aside with write-invalidate
+@Transactional
+public User updateUser(Long id, UserUpdateRequest req) {
+    User user = userRepository.findById(id).orElseThrow();
+    user.setName(req.getName());
+    user.setEmail(req.getEmail());
+    userRepository.save(user);             // 1. write DB
+    redisTemplate.delete("user:" + id);    // 2. invalidate cache
+    return user;
+}
+
+@Cacheable(cacheNames = "users", key = "#id")
+public User getUser(Long id) {             // repopulates on next read
+    return userRepository.findById(id).orElseThrow();
+}
+```
+
+**Failure mode — dual-write bug:**
+```
+  App writes Postgres ✓
+  App crashes before DEL  →  cache is stale for full TTL
+  Fix: always set a TTL as a backstop even when using explicit invalidation.
+       The DEL is the fast path; TTL is the safety net.
+```
+
+**Failure mode — race condition (read-write interleaving):**
+```
+  T1 (read):  cache MISS → queries DB → gets value V1
+  T2 (write): writes V2 to DB → DEL cache key
+  T1 (read):  SET cache = V1  ← stale! V2 is in DB but V1 is now cached
+
+  Fix: use versioned writes. SET cache = V2 only if version > cached version.
+  Or: set a short TTL (30s) so the stale entry self-heals quickly.
+```
+
+**When to use:** General-purpose. The default pattern for most services. Works well when write frequency is moderate and a brief stale window is acceptable.
+
+---
+
+### Strategy 3: Write-Through
+
+The cache is the intermediary — every write goes to the cache first, which synchronously persists to the DB.
+
+```
+  Write path:
+  ┌─────┐  PUT /profile  ┌───────────────────────────────┐
+  │ App │ ─────────────► │ Cache Layer (e.g. Redis + sync) │
+  └─────┘                └───────────────┬───────────────┘
+                                         │ synchronous write
+                                         ▼
+                                   ┌────────────┐
+                                   │  Postgres   │
+                                   └────────────┘
+
+  Read path: always a cache HIT (data was written through)
+  ┌─────┐  GET /profile  ┌───────┐  HIT  ┌─────────────────┐
+  │ App │ ─────────────► │ Redis │ ─────► │ return cached   │
+  └─────┘                └───────┘        └─────────────────┘
+```
+
+```java
+// Write-through: write to cache AND DB in a single service call
+@Transactional
+public User updateUser(Long id, UserUpdateRequest req) {
+    User user = userRepository.findById(id).orElseThrow();
+    user.setName(req.getName());
+    userRepository.save(user);                  // 1. write DB
+
+    // 2. write cache synchronously (write-through)
+    String key = "user:" + id;
+    redisTemplate.opsForValue().set(key, user, Duration.ofHours(1));
+    return user;
+}
+// Reads are always cache hits — no miss-and-repopulate round trip.
+```
+
+```
+  Pros:
+  ✓ Cache is always consistent with DB (no stale reads).
+  ✓ Reads are always fast (never miss on data that was recently written).
+
+  Cons:
+  ✗ Write latency = DB write + cache write (two synchronous I/Os).
+  ✗ Write-amplification: data written once to DB and once to cache.
+  ✗ Cache fills with data that may never be read ("write inflation").
+     Fix: use write-through only for hot read paths.
+```
+
+**When to use:** User session data, auth tokens, rate-limit counters — data that is written and immediately read. Write frequency is low; read frequency is very high.
+
+---
+
+### Strategy 4: Write-Behind (Write-Back)
+
+The app writes to the cache only. The cache asynchronously flushes to the DB in the background.
+
+```
+  Write path (synchronous to app):
+  ┌─────┐  PUT /profile  ┌───────┐  ACK immediately
+  │ App │ ─────────────► │ Redis │ ─────────────────► App continues
+  └─────┘                └───┬───┘
+                             │  async flush (batched, 100ms later)
+                             ▼
+                       ┌────────────┐
+                       │  Postgres   │
+                       └────────────┘
+
+  Sequence:
+  t=0ms:   App writes user:123 to Redis  →  returns 200 OK
+  t=100ms: Background worker flushes batch of 500 writes to Postgres
+```
+
+```
+  Pros:
+  ✓ Write latency ≈ Redis latency (~0.5ms), not DB latency (~5ms).
+  ✓ Write batching: 500 writes merged into a single bulk INSERT → DB throughput ×10.
+  ✓ Absorbs write spikes (burst → cache absorbs, DB sees steady trickle).
+
+  Cons:
+  ✗ Data loss: if Redis crashes before flush, the unflushed writes are GONE.
+  ✗ Read-your-own-writes: immediately after writing, the DB doesn't have the data.
+     If another service reads directly from DB, it sees stale data.
+  ✗ Ordering: concurrent writes to the same key must be sequenced carefully.
+```
+
+**When to use:** Write-heavy, loss-tolerant counters — view counts, like counts, analytics events. Never for financial data or anything requiring durability.
+
+---
+
+### Strategy 5: Event-Driven Invalidation via CDC
+
+Remove invalidation logic from the application entirely. The database itself triggers cache updates via the WAL (Write-Ahead Log).
+
+```
+  Write path (app only touches DB):
+  ┌─────┐  PUT /profile  ┌────────────┐
+  │ App │ ─────────────► │  Postgres  │  ← App writes ONLY here
+  └─────┘                └─────┬──────┘
+                                │ WAL (Write-Ahead Log)
+                                ▼
+                        ┌───────────────┐
+                        │   Debezium    │  ← tails the WAL
+                        │   (CDC agent) │
+                        └───────┬───────┘
+                                │ publishes change event
+                                ▼
+                          ┌───────────┐
+                          │   Kafka   │  topic: db.users.changes
+                          └─────┬─────┘
+                                │ consumes
+                                ▼
+                    ┌───────────────────────┐
+                    │   Cache Sync Worker   │
+                    │                       │
+                    │  DEL user:123  (Redis) │  ← L2 invalidation
+                    │  PUBLISH invalidate   │  ← L1 invalidation broadcast
+                    │  (Redis Pub/Sub)      │
+                    └───────────────────────┘
+                                │
+                    ┌───────────┴──────────────┐
+                    ▼                          ▼
+            ┌──────────────┐          ┌──────────────┐
+            │  App Pod 1   │          │  App Pod 2   │
+            │  L1: evict   │          │  L1: evict   │
+            │  user:123    │          │  user:123    │
+            └──────────────┘          └──────────────┘
+```
+
+**Why CDC beats app-level invalidation:**
+
+```
+  App-level:
+  1. App writes Postgres                    ← can fail here (no invalidation)
+  2. App calls DEL on Redis                 ← can fail here (stale cache)
+  3. App crashes between 1 and 2            ← stale cache for full TTL
+
+  CDC:
+  1. App writes Postgres
+     └─ Postgres atomically writes WAL entry
+  2. Debezium reads WAL (guaranteed, Postgres ensures WAL durability)
+  3. Cache sync worker invalidates          ← cannot be bypassed by any code path
+  → No dual-write. No crash window. Guaranteed consistency.
+```
+
+```java
+// Kafka consumer — cache sync worker
+@KafkaListener(topics = "db.users.changes")
+public void onUserChange(ConsumerRecord<String, String> record) {
+    DbChangeEvent event = objectMapper.readValue(record.value(), DbChangeEvent.class);
+    String userId = event.getAfter().get("id").toString();
+
+    // Invalidate L2 (Redis)
+    redisTemplate.delete("user:" + userId);
+
+    // Broadcast L1 invalidation to all app pods via Pub/Sub
+    redisTemplate.convertAndSend("cache:invalidate:users", userId);
+}
+
+// In each app pod: listen for L1 invalidation broadcasts
+@Component
+public class L1CacheInvalidationListener implements MessageListener {
+    private final Cache userL1Cache; // Caffeine in-process cache
+
+    @Override
+    public void onMessage(Message message, byte[] pattern) {
+        String userId = new String(message.getBody());
+        userL1Cache.invalidate(userId);
+    }
+}
+```
+
+**When to use:** Any service where stale cache is a serious problem — financial data, access control, user profiles, inventory. The gold standard for production systems at scale.
+
+---
+
+### Strategy 6: Tag-Based Invalidation
+
+Group cache keys under a shared tag. Invalidate the tag to evict all associated entries at once.
+
+```
+  Example: product catalog with category-level invalidation
+
+  Cache entries:
+  ┌──────────────────────────────────────┬──────────────────┐
+  │ Key                                  │ Tags             │
+  ├──────────────────────────────────────┼──────────────────┤
+  │ product:42                           │ cat:Electronics  │
+  │ product:99                           │ cat:Electronics  │
+  │ products:list:Electronics:page1      │ cat:Electronics  │
+  │ products:list:Electronics:page2      │ cat:Electronics  │
+  │ product:7                            │ cat:Clothing     │
+  └──────────────────────────────────────┴──────────────────┘
+
+  Admin updates an Electronics product:
+  SMEMBERS tag:cat:Electronics
+  → ["product:42", "product:99", "products:list:Electronics:page1", ...]
+  DEL all of them in one pipeline
+
+  Result: all Electronics-related cache entries evicted atomically.
+  Clothing entries untouched.
+```
+
+```java
+// Tag-based cache write: store the key, register it under tag
+public void cacheProduct(Product product) {
+    String key = "product:" + product.getId();
+    String tag = "tag:cat:" + product.getCategory();
+
+    redisTemplate.opsForValue().set(key, product, Duration.ofHours(1));
+    redisTemplate.opsForSet().add(tag, key);           // register key under tag
+    redisTemplate.expire(tag, Duration.ofHours(2));    // tag TTL >= key TTL
+}
+
+// Tag-based invalidation: evict all keys under a category tag
+public void invalidateCategory(String category) {
+    String tag = "tag:cat:" + category;
+    Set<String> keys = redisTemplate.opsForSet().members(tag);
+    if (keys != null && !keys.isEmpty()) {
+        redisTemplate.delete(keys);     // evict all product keys for this category
+        redisTemplate.delete(tag);      // remove the tag itself
+    }
+}
+```
+
+**When to use:** Content management, product catalogs, user-generated feeds — anywhere one write should invalidate multiple related cache entries. Avoids hunting down individual keys.
+
+---
+
+### Strategy Comparison
+
+```
+  ┌─────────────────┬──────────┬──────────┬────────────────┬────────────────┐
+  │ Strategy        │ Staleness│ Complexity│ Failure Risk   │ Best For       │
+  ├─────────────────┼──────────┼──────────┼────────────────┼────────────────┤
+  │ TTL expiration  │ Up to TTL│ Minimal  │ Stampede on    │ Public data,   │
+  │                 │          │          │ expiry         │ low-write      │
+  ├─────────────────┼──────────┼──────────┼────────────────┼────────────────┤
+  │ Cache-aside     │ Miss      │ Low      │ Dual-write bug,│ General CRUD,  │
+  │ (delete-on-write)│ window  │          │ race on reads  │ most services  │
+  ├─────────────────┼──────────┼──────────┼────────────────┼────────────────┤
+  │ Write-through   │ None     │ Medium   │ Write latency  │ Read-heavy,    │
+  │                 │          │          │ doubles        │ session data   │
+  ├─────────────────┼──────────┼──────────┼────────────────┼────────────────┤
+  │ Write-behind    │ Possible │ High     │ Data loss on   │ Counters,      │
+  │                 │          │          │ cache crash    │ analytics      │
+  ├─────────────────┼──────────┼──────────┼────────────────┼────────────────┤
+  │ CDC (event-     │ Near-zero│ High     │ Kafka lag (ms) │ Financial,     │
+  │  driven)        │          │          │                │ access control │
+  ├─────────────────┼──────────┼──────────┼────────────────┼────────────────┤
+  │ Tag-based       │ Miss      │ Medium   │ Tag memory     │ Catalog, CMS,  │
+  │                 │ window   │          │ growth         │ group eviction │
+  └─────────────────┴──────────┴──────────┴────────────────┴────────────────┘
+```
+
+### Decision flowchart
+
+```mermaid
+flowchart TD
+    A([Cache invalidation needed]) --> B{Can tolerate stale\ndata up to N minutes?}
+
+    B -- Yes\n low-traffic, public data --> C[TTL expiration\nSet TTL + jitter\nNo invalidation code]
+
+    B -- No --> D{Who originates\nthe write?}
+
+    D -- Single app\n controls all writes --> E{Write latency\ncritical?}
+
+    E -- No\n writes are rare --> F[Cache-aside\nDEL after DB write\n+ TTL as backstop]
+
+    E -- Yes\n writes are frequent\nand immediately read --> G[Write-through\nSET cache synchronously\nalongside DB write]
+
+    D -- Multiple services\nor direct DB writes\nexist --> H[CDC / Event-driven\nDebezium → Kafka\n→ cache worker]
+
+    F --> I{One write affects\nmany cache keys?}
+    G --> I
+    I -- Yes --> J[Add tag-based layer\nGroup keys under tag\nInvalidate tag on write]
+    I -- No --> K[Done]
+
+    H --> K
+    C --> K
+
+    style C fill:#4a9eff,color:#fff
+    style F fill:#22c55e,color:#fff
+    style G fill:#22c55e,color:#fff
+    style H fill:#f59e0b,color:#fff
+    style J fill:#a855f7,color:#fff
+```
+
