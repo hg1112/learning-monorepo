@@ -65,7 +65,7 @@ ${BOLD}Usage:${NC}
   ./setup.sh              (interactive checklist)
 
 ${BOLD}Backend flags:${NC}
-  --postgres        PostgreSQL ${POSTGRES_VERSION} + pgvector          :5432
+  --postgres        PostgreSQL ${POSTGRES_VERSION} + pgvector + Citus   :5432
   --cassandra       Apache Cassandra 4.1              :9042
   --redis           Redis (latest)                    :6379
   --mongodb         MongoDB 7.x                       :27017
@@ -171,7 +171,7 @@ _whiptail_select() {
   local choices
   choices=$(whiptail --title "Stack Setup" \
     --checklist "Space to select, Enter to confirm:" 35 65 28 \
-    "postgres"       "PostgreSQL ${POSTGRES_VERSION} + pgvector  :5432"    OFF \
+    "postgres"       "PostgreSQL ${POSTGRES_VERSION} + pgvector + Citus  :5432"    OFF \
     "cassandra"      "Cassandra 4.1               :9042"    OFF \
     "redis"          "Redis                        :6379"    OFF \
     "mongodb"        "MongoDB 7.x                 :27017"   OFF \
@@ -516,13 +516,36 @@ setup_repos() {
 
 install_postgres() {
   command -v psql &>/dev/null && { log_warn "PostgreSQL already installed, skipping"; return; }
-  log_info "Installing PostgreSQL ${POSTGRES_VERSION} + pgvector..."
+  log_info "Installing PostgreSQL ${POSTGRES_VERSION} + pgvector + Citus..."
+
+  # Citus apt repo (provides postgresql-<ver>-citus-* packages)
+  if ! apt-cache show "postgresql-${POSTGRES_VERSION}-citus-12.1" &>/dev/null 2>&1; then
+    log_info "Adding Citus apt repository..."
+    curl -fsSL https://install.citusdata.com/community/deb.sh | sudo bash
+  fi
+
   sudo apt-get install -y -qq \
     "postgresql-${POSTGRES_VERSION}" \
     "postgresql-${POSTGRES_VERSION}-pgvector" \
+    "postgresql-${POSTGRES_VERSION}-citus-12.1" \
     "postgresql-client-${POSTGRES_VERSION}"
+
+  # Citus must be in shared_preload_libraries — loaded at server start, not dynamically
+  local pg_conf="/etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf"
+  if ! sudo grep -q "citus" "${pg_conf}" 2>/dev/null; then
+    log_info "Adding citus to shared_preload_libraries..."
+    if sudo grep -q "^shared_preload_libraries" "${pg_conf}"; then
+      sudo sed -i "s/^shared_preload_libraries\s*=\s*'\(.*\)'/shared_preload_libraries = '\1,citus'/" "${pg_conf}"
+      # Clean up leading comma if list was empty
+      sudo sed -i "s/= ',citus'/= 'citus'/" "${pg_conf}"
+    else
+      echo "shared_preload_libraries = 'citus'" | sudo tee -a "${pg_conf}" >/dev/null
+    fi
+  fi
+
   sudo systemctl enable postgresql
-  log_success "PostgreSQL ${POSTGRES_VERSION} installed"
+  log_success "PostgreSQL ${POSTGRES_VERSION} + pgvector + Citus installed"
+  log_info  "Run: CREATE EXTENSION citus; in each database that needs sharding"
 }
 
 install_cassandra() {
