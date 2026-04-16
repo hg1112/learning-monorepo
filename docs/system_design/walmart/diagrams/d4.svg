@@ -1,0 +1,50 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="white"/>
+  
+  <text x="600" y="40" font-family="Arial" font-size="24" font-weight="bold" text-anchor="middle" fill="#455a64">TROAS Data Propagation Service Map</text>
+
+  <!-- Nodes -->
+  <rect x="50" y="100" width="160" height="80" rx="10" fill="#e8f0fe" stroke="#0055aa" stroke-width="2"/>
+  <text x="130" y="145" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#0055aa">Campaign Service</text>
+
+  <rect x="300" y="100" width="160" height="80" rx="10" fill="#e8f5e9" stroke="#1b5e20" stroke-width="2"/>
+  <text x="380" y="145" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#1b5e20">Campaign Indexer</text>
+
+  <rect x="550" y="100" width="160" height="80" rx="10" fill="#fff3e0" stroke="#bf360c" stroke-width="2"/>
+  <text x="630" y="145" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#bf360c">Ad Orchestrator</text>
+
+  <rect x="800" y="100" width="160" height="80" rx="10" fill="#f3e5f5" stroke="#4a148c" stroke-width="2"/>
+  <text x="880" y="145" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#4a148c">Bidding Engine</text>
+
+  <rect x="1000" y="250" width="160" height="80" rx="10" fill="#eceff1" stroke="#455a64" stroke-width="2"/>
+  <text x="1080" y="295" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#455a64">Auction Engine</text>
+
+  <!-- Arrows and Labels -->
+  <path d="M210 140 L300 140" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <rect x="220" y="150" width="70" height="20" rx="4" fill="#fbe9e7"/>
+  <text x="255" y="165" font-family="Arial" font-size="10" font-weight="bold" text-anchor="middle" fill="#bf360c">targetRoas</text>
+
+  <path d="M460 140 L550 140" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <rect x="470" y="150" width="70" height="20" rx="4" fill="#fbe9e7"/>
+  <text x="505" y="165" font-family="Arial" font-size="10" font-weight="bold" text-anchor="middle" fill="#bf360c">troas_flag</text>
+
+  <path d="M710 140 L800 140" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <rect x="720" y="150" width="80" height="30" rx="4" fill="#f3e5f5"/>
+  <text x="760" y="163" font-family="Arial" font-size="9" font-weight="bold" text-anchor="middle" fill="#4a148c">budgetBucketId</text>
+  <text x="760" y="174" font-family="Arial" font-size="9" font-weight="bold" text-anchor="middle" fill="#4a148c">(bbid)</text>
+
+  <path d="M960 140 L1080 140 L1080 250" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <rect x="1010" y="180" width="110" height="40" rx="4" fill="#e1f5fe"/>
+  <text x="1065" y="198" font-family="Arial" font-size="11" font-weight="bold" text-anchor="middle" fill="#0055aa">troasNode JSON</text>
+  <text x="1065" y="212" font-family="Arial" font-size="9" text-anchor="middle" fill="#0055aa">(phase, weights, sd, bp)</text>
+
+  <!-- Loopback for Click Attribution -->
+  <path d="M1000 290 L50 290 L50 180" stroke="#1b5e20" stroke-width="2" stroke-dasharray="5,5" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="525" y="280" font-family="Arial" font-size="12" font-style="italic" text-anchor="middle" fill="#1b5e20">Click Attribution: existing_bkt | bb_{bbid}</text>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#455a64" />
+    </marker>
+  </defs>
+</svg>

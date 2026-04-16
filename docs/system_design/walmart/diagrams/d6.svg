@@ -1,0 +1,40 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="white"/>
+  
+  <text x="600" y="50" font-family="Arial" font-size="28" font-weight="bold" text-anchor="middle" fill="#455a64">Thompson Sampling: Thompson Beta Distributions</text>
+
+  <!-- Axes -->
+  <line x1="150" y1="500" x2="1050" y2="500" stroke="#455a64" stroke-width="2"/>
+  <line x1="150" y1="100" x2="150" y2="500" stroke="#455a64" stroke-width="2"/>
+  <text x="600" y="550" font-family="Arial" font-size="18" text-anchor="middle">Bid Price ($)</text>
+  <text x="80" y="300" font-family="Arial" font-size="18" text-anchor="middle" transform="rotate(-90, 80, 300)">Probability Density</text>
+
+  <!-- Price points -->
+  <text x="250" y="520" font-family="Arial" font-size="14" text-anchor="middle">$0.20</text>
+  <text x="450" y="520" font-family="Arial" font-size="14" text-anchor="middle">$0.40</text>
+  <text x="650" y="520" font-family="Arial" font-size="14" text-anchor="middle">$0.60</text>
+  <text x="850" y="520" font-family="Arial" font-size="14" text-anchor="middle">$0.80</text>
+
+  <!-- Beta(4,8) - $0.20 - Narrow, low -->
+  <path d="M150 500 Q 250 100, 350 500" stroke="#0055aa" stroke-width="3" fill="#0055aa" fill-opacity="0.1"/>
+  <text x="250" y="250" font-family="Arial" font-size="12" text-anchor="middle" fill="#0055aa" font-weight="bold">Beta(4,8)</text>
+
+  <!-- Beta(5,9) - $0.40 - Mid-narrow -->
+  <path d="M300 500 Q 450 150, 600 500" stroke="#1b5e20" stroke-width="3" fill="#1b5e20" fill-opacity="0.1"/>
+  <text x="450" y="300" font-family="Arial" font-size="12" text-anchor="middle" fill="#1b5e20" font-weight="bold">Beta(5,9)</text>
+
+  <!-- Beta(6,7) - $0.60 - "Best" - Tallest -->
+  <path d="M500 500 Q 650 50, 800 500" stroke="#bf360c" stroke-width="4" fill="#bf360c" fill-opacity="0.1"/>
+  <text x="650" y="200" font-family="Arial" font-size="12" text-anchor="middle" fill="#bf360c" font-weight="bold">Beta(6,7) - WINNER</text>
+
+  <!-- Beta(2,6) - $0.80 - Under-explored - Flat/Wide -->
+  <path d="M150 450 C 400 400, 700 400, 1050 480" stroke="#4a148c" stroke-width="3" fill="#4a148c" fill-opacity="0.1"/>
+  <text x="900" y="420" font-family="Arial" font-size="12" text-anchor="middle" fill="#4a148c" font-weight="bold">Beta(2,6) - HIGH UNCERTAINTY</text>
+
+  <!-- Legend -->
+  <rect x="850" y="100" width="200" height="120" rx="5" fill="#f5f5f5" stroke="#455a64"/>
+  <text x="860" y="125" font-family="Arial" font-size="14" font-weight="bold">Exploration Status</text>
+  <circle cx="870" cy="150" r="5" fill="#0055aa"/> <text x="885" y="155" font-family="Arial" font-size="12">Low price, high certainty</text>
+  <circle cx="870" cy="175" r="5" fill="#bf360c"/> <text x="885" y="180" font-family="Arial" font-size="12">Best ROAS, exploit</text>
+  <circle cx="870" cy="200" r="5" fill="#4a148c"/> <text x="885" y="205" font-family="Arial" font-size="12">High price, explore</text>
+</svg>

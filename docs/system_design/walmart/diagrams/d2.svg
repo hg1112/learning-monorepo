@@ -1,0 +1,62 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="white"/>
+  
+  <!-- Lifelines -->
+  <line x1="100" y1="80" x2="100" y2="550" stroke="#455a64" stroke-width="2" stroke-dasharray="5,5"/>
+  <line x1="350" y1="80" x2="350" y2="550" stroke="#455a64" stroke-width="2" stroke-dasharray="5,5"/>
+  <line x1="600" y1="80" x2="600" y2="550" stroke="#455a64" stroke-width="2" stroke-dasharray="5,5"/>
+  <line x1="850" y1="80" x2="850" y2="550" stroke="#455a64" stroke-width="2" stroke-dasharray="5,5"/>
+  <line x1="1100" y1="80" x2="1100" y2="550" stroke="#455a64" stroke-width="2" stroke-dasharray="5,5"/>
+  
+  <rect x="50" y="40" width="100" height="40" fill="#0055aa" rx="5"/>
+  <text x="100" y="65" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="white">Shopper</text>
+  
+  <rect x="300" y="40" width="100" height="40" fill="#0055aa" rx="5"/>
+  <text x="350" y="65" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="white">Ad Gateway</text>
+  
+  <rect x="550" y="40" width="100" height="40" fill="#0055aa" rx="5"/>
+  <text x="600" y="65" font-family="Arial" font-size="12" font-weight="bold" text-anchor="middle" fill="white">Ad Orchestrator</text>
+  
+  <rect x="800" y="40" width="100" height="40" fill="#1b5e20" rx="5"/>
+  <text x="850" y="65" font-family="Arial" font-size="12" font-weight="bold" text-anchor="middle" fill="white">Auction Engine</text>
+  
+  <rect x="1050" y="40" width="100" height="40" fill="#bf360c" rx="5"/>
+  <text x="1100" y="65" font-family="Arial" font-size="12" font-weight="bold" text-anchor="middle" fill="white">Bidding Engine</text>
+
+  <!-- Request -->
+  <path d="M100 120 L350 120" stroke="#0055aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="225" y="115" font-family="Arial" font-size="12" text-anchor="middle">Search Request</text>
+  
+  <path d="M350 150 L600 150" stroke="#0055aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="475" y="145" font-family="Arial" font-size="12" text-anchor="middle">Fan-out</text>
+
+  <!-- Parallel Calls -->
+  <rect x="590" y="170" width="20" height="280" fill="#e8f0fe" stroke="#0055aa"/>
+  
+  <path d="M610 180 L1100 180" stroke="#bf360c" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="855" y="175" font-family="Arial" font-size="11" text-anchor="middle" fill="#bf360c">Get Bids (Parallel)</text>
+  
+  <path d="M610 220 L850 220" stroke="#1b5e20" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="730" y="215" font-family="Arial" font-size="11" text-anchor="middle" fill="#1b5e20">Auction Call (Parallel)</text>
+  
+  <!-- TSP Auction Logic -->
+  <rect x="840" y="250" width="20" height="120" fill="#e8f5e9" stroke="#1b5e20"/>
+  <path d="M860 270 L950 270 L950 330 L860 330" stroke="#1b5e20" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="960" y="305" font-family="Arial" font-size="11" text-anchor="start" fill="#1b5e20">TSP Auction Logic</text>
+
+  <!-- Responses -->
+  <path d="M1100 400 L610 400" stroke="#bf360c" stroke-width="2" stroke-dasharray="4,2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M850 430 L610 430" stroke="#1b5e20" stroke-width="2" stroke-dasharray="4,2" fill="none" marker-end="url(#arrow)"/>
+  
+  <path d="M600 480 L350 480" stroke="#0055aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="475" y="475" font-family="Arial" font-size="12" text-anchor="middle">Merged Ad List</text>
+  
+  <path d="M350 520 L100 520" stroke="#0055aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="225" y="515" font-family="Arial" font-size="12" text-anchor="middle">AdResponse (Tracking URLs)</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="context-stroke" />
+    </marker>
+  </defs>
+</svg>

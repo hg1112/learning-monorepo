@@ -1,0 +1,56 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="white"/>
+  
+  <text x="600" y="50" font-family="Arial" font-size="28" font-weight="bold" text-anchor="middle" fill="#455a64">TROAS Campaign Phase State Machine</text>
+
+  <!-- States -->
+  <!-- INITIALIZATION -->
+  <rect x="100" y="120" width="220" height="100" rx="15" fill="#e3f2fd" stroke="#1565c0" stroke-width="3"/>
+  <text x="210" y="155" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#1565c0">INITIALIZATION</text>
+  <text x="210" y="185" font-family="Arial" font-size="12" text-anchor="middle" fill="#1565c0">Bid = bidPrime × dpf × pf</text>
+  <text x="210" y="200" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle" fill="#1565c0">(Cold Start / Setup)</text>
+
+  <!-- LEARNING -->
+  <rect x="490" y="120" width="220" height="100" rx="15" fill="#fff3e0" stroke="#e65100" stroke-width="3"/>
+  <text x="600" y="155" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#e65100">LEARNING</text>
+  <text x="600" y="185" font-family="Arial" font-size="12" text-anchor="middle" fill="#e65100">Thompson Sampling (Beta Dist)</text>
+  <text x="600" y="200" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle" fill="#e65100">(Data Collection)</text>
+
+  <!-- OPTIMIZATION -->
+  <rect x="880" y="120" width="220" height="100" rx="15" fill="#e8f5e9" stroke="#1b5e20" stroke-width="3"/>
+  <text x="990" y="155" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#1b5e20">OPTIMIZATION</text>
+  <text x="990" y="185" font-family="Arial" font-size="12" text-anchor="middle" fill="#1b5e20">Bid = pRPC (w1*roas + w2*prpc)</text>
+  <text x="990" y="200" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle" fill="#1b5e20">(ML-Driven Performance)</text>
+
+  <!-- LEARNING_PAUSED -->
+  <rect x="490" y="320" width="220" height="100" rx="15" fill="#fce4ec" stroke="#c62828" stroke-width="3"/>
+  <text x="600" y="360" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#c62828">LEARNING_PAUSED</text>
+  <text x="600" y="390" font-family="Arial" font-size="12" text-anchor="middle" fill="#c62828">No Bid / Auction Excluded</text>
+  <text x="600" y="405" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle" fill="#c62828">(Budget Out / Manual Pause)</text>
+
+  <!-- TRANSITION -->
+  <rect x="880" y="320" width="220" height="100" rx="15" fill="#f3e5f5" stroke="#4a148c" stroke-width="3"/>
+  <text x="990" y="360" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#4a148c">TRANSITION</text>
+  <text x="990" y="390" font-family="Arial" font-size="12" text-anchor="middle" fill="#4a148c">ROAS Wind-down</text>
+  <text x="990" y="405" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle" fill="#4a148c">(Experiment Applied)</text>
+
+  <!-- Transitions -->
+  <path d="M320 170 L490 170" stroke="#455a64" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <text x="405" y="160" font-family="Arial" font-size="11" text-anchor="middle" fill="#455a64">Go Live</text>
+
+  <path d="M710 170 L880 170" stroke="#455a64" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <text x="795" y="160" font-family="Arial" font-size="11" text-anchor="middle" fill="#455a64">Model Trained</text>
+
+  <path d="M600 220 L600 320" stroke="#c62828" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M580 320 L580 220" stroke="#1b5e20" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="650" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#c62828">Out of Budget</text>
+
+  <path d="M990 220 L990 320" stroke="#455a64" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <text x="1050" y="275" font-family="Arial" font-size="11" text-anchor="middle" fill="#455a64">Strategy Switch</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#455a64" />
+    </marker>
+  </defs>
+</svg>

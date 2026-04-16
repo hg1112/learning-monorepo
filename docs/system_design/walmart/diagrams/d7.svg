@@ -1,0 +1,55 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="white"/>
+  
+  <text x="600" y="50" font-family="Arial" font-size="28" font-weight="bold" text-anchor="middle" fill="#455a64">TROAS Bid Formula Decision Tree</text>
+
+  <!-- Root -->
+  <rect x="500" y="100" width="200" height="60" rx="10" fill="#e1f5fe" stroke="#01579b" stroke-width="2"/>
+  <text x="600" y="135" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle" fill="#01579b">Branch on Phase?</text>
+
+  <!-- Level 1 Branches -->
+  <path d="M500 130 L150 130 L150 200" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M550 160 L350 200" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M600 160 L600 200" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M650 160 L850 200" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M700 130 L1050 130 L1050 200" stroke="#455a64" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Phase Nodes -->
+  <rect x="50" y="200" width="200" height="60" rx="5" fill="#e3f2fd" stroke="#1565c0"/>
+  <text x="150" y="235" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#1565c0">INITIALIZATION</text>
+
+  <rect x="250" y="200" width="200" height="60" rx="5" fill="#fff3e0" stroke="#e65100"/>
+  <text x="350" y="235" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#e65100">LEARNING</text>
+
+  <rect x="500" y="200" width="200" height="60" rx="5" fill="#fce4ec" stroke="#c62828"/>
+  <text x="600" y="235" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#c62828">PAUSED</text>
+
+  <rect x="750" y="200" width="200" height="60" rx="5" fill="#e8f5e9" stroke="#1b5e20"/>
+  <text x="850" y="235" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#1b5e20">OPTIMIZATION</text>
+
+  <rect x="950" y="200" width="200" height="60" rx="5" fill="#f3e5f5" stroke="#4a148c"/>
+  <text x="1050" y="235" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#4a148c">TRANSITION</text>
+
+  <!-- Formulas -->
+  <text x="150" y="285" font-family="Courier New" font-size="11" text-anchor="middle" fill="#37474f">bidPrime * dpf * pf</text>
+  <text x="350" y="285" font-family="Courier New" font-size="11" text-anchor="middle" fill="#37474f">Thompson(BetaDist)</text>
+  <text x="600" y="285" font-family="Courier New" font-size="11" text-anchor="middle" fill="#37474f">0.0 (No Bid)</text>
+  <text x="850" y="285" font-family="Courier New" font-size="11" text-anchor="middle" fill="#37474f">w1*roas + w2*prpc</text>
+  <text x="1050" y="285" font-family="Courier New" font-size="11" text-anchor="middle" fill="#37474f">roasBid wind-down</text>
+
+  <!-- Convergence -->
+  <path d="M150 300 L600 450" stroke="#455a64" stroke-width="1.5" stroke-dasharray="4,2" fill="none"/>
+  <path d="M350 300 L600 450" stroke="#455a64" stroke-width="1.5" stroke-dasharray="4,2" fill="none"/>
+  <path d="M850 300 L600 450" stroke="#455a64" stroke-width="1.5" stroke-dasharray="4,2" fill="none"/>
+  <path d="M1050 300 L600 450" stroke="#455a64" stroke-width="1.5" stroke-dasharray="4,2" fill="none"/>
+
+  <rect x="450" y="450" width="300" height="80" rx="15" fill="#lgrey" stroke="#455a64" stroke-width="3"/>
+  <text x="600" y="485" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle" fill="#455a64">finalCPC = round(clamp(...))</text>
+  <text x="600" y="510" font-family="Arial" font-size="14" text-anchor="middle" fill="#455a64">[bb.low, bb.high] @ 4dp</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#455a64" />
+    </marker>
+  </defs>
+</svg>

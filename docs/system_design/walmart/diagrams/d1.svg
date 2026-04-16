@@ -1,0 +1,58 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="white"/>
+  <text x="600" y="40" font-family="Arial" font-size="24" font-weight="bold" text-anchor="middle" fill="#455a64">Walmart Sponsored Products: 4-Plane Architecture</text>
+  
+  <!-- Plane 1: Advertiser Plane -->
+  <rect x="50" y="80" width="240" height="480" rx="10" fill="#e8f0fe" stroke="#0055aa" stroke-width="2"/>
+  <text x="170" y="110" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle" fill="#0055aa">Advertiser Plane</text>
+  <rect x="70" y="140" width="200" height="60" rx="5" fill="white" stroke="#0055aa"/>
+  <text x="170" y="175" font-family="Arial" font-size="14" text-anchor="middle">Campaign Service</text>
+  <rect x="70" y="220" width="200" height="60" rx="5" fill="white" stroke="#0055aa"/>
+  <text x="170" y="255" font-family="Arial" font-size="14" text-anchor="middle">AI Advertiser Agent</text>
+  <rect x="70" y="300" width="200" height="60" rx="5" fill="white" stroke="#0055aa"/>
+  <text x="170" y="335" font-family="Arial" font-size="14" text-anchor="middle">Experiment Service</text>
+
+  <!-- Plane 2: Indexing Pipeline -->
+  <rect x="330" y="80" width="240" height="480" rx="10" fill="#e8f5e9" stroke="#1b5e20" stroke-width="2"/>
+  <text x="450" y="110" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle" fill="#1b5e20">Indexing Pipeline</text>
+  <rect x="350" y="140" width="200" height="60" rx="5" fill="white" stroke="#1b5e20"/>
+  <text x="450" y="175" font-family="Arial" font-size="14" text-anchor="middle">Campaign Indexer</text>
+  <path d="M450 250 L450 350 M400 300 L500 300" stroke="#1b5e20" stroke-width="2" fill="none"/>
+  <ellipse cx="450" cy="400" rx="60" ry="40" fill="white" stroke="#1b5e20"/>
+  <text x="450" y="405" font-family="Arial" font-size="14" text-anchor="middle">Ad Index (Solr/Vespa)</text>
+
+  <!-- Plane 3: Ad Serving & ML -->
+  <rect x="610" y="80" width="240" height="480" rx="10" fill="#fff3e0" stroke="#bf360c" stroke-width="2"/>
+  <text x="730" y="110" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle" fill="#bf360c">Ad Serving &amp; ML</text>
+  <rect x="630" y="130" width="200" height="40" rx="5" fill="white" stroke="#bf360c"/>
+  <text x="730" y="155" font-family="Arial" font-size="12" text-anchor="middle">Ad Gateway</text>
+  <rect x="630" y="180" width="200" height="40" rx="5" fill="white" stroke="#bf360c"/>
+  <text x="730" y="205" font-family="Arial" font-size="12" text-anchor="middle">Ad Orchestrator</text>
+  <rect x="630" y="230" width="200" height="40" rx="5" fill="white" stroke="#bf360c"/>
+  <text x="730" y="255" font-family="Arial" font-size="12" text-anchor="middle">Bidding Engine</text>
+  <rect x="630" y="280" width="200" height="40" rx="5" fill="white" stroke="#bf360c"/>
+  <text x="730" y="305" font-family="Arial" font-size="12" text-anchor="middle">Auction Engine</text>
+  <rect x="630" y="330" width="200" height="40" rx="5" fill="white" stroke="#bf360c"/>
+  <text x="730" y="355" font-family="Arial" font-size="12" text-anchor="middle">ML Platform</text>
+  <rect x="630" y="380" width="200" height="40" rx="5" fill="white" stroke="#bf360c"/>
+  <text x="730" y="405" font-family="Arial" font-size="12" text-anchor="middle">Feature Store</text>
+
+  <!-- Plane 4: Click & Budget -->
+  <rect x="890" y="80" width="240" height="480" rx="10" fill="#f3e5f5" stroke="#4a148c" stroke-width="2"/>
+  <text x="1010" y="110" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle" fill="#4a148c">Click &amp; Budget</text>
+  <rect x="910" y="140" width="200" height="60" rx="5" fill="white" stroke="#4a148c"/>
+  <text x="1010" y="175" font-family="Arial" font-size="14" text-anchor="middle">Click Service</text>
+  <rect x="910" y="220" width="200" height="60" rx="5" fill="white" stroke="#4a148c"/>
+  <text x="1010" y="255" font-family="Arial" font-size="14" text-anchor="middle">Budget Service</text>
+
+  <!-- Flow Arrows -->
+  <path d="M290 300 L330 300" stroke="#455a64" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M570 300 L610 300" stroke="#455a64" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M850 300 L890 300" stroke="#455a64" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#455a64" />
+    </marker>
+  </defs>
+</svg>

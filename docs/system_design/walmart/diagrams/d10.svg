@@ -1,0 +1,46 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="600" fill="#f8f9fa"/>
+  <rect width="1200" height="50" fill="#343a40"/>
+  <text x="20" y="32" font-family="Arial" font-size="18" font-weight="bold" fill="white">TROAS Performance Dashboard</text>
+  <text x="1180" y="32" font-family="Arial" font-size="14" fill="white" text-anchor="end">Last 24 Hours</text>
+
+  <!-- Panel 1: Phase Distribution (Pie) -->
+  <rect x="30" y="70" width="360" height="240" rx="5" fill="white" stroke="#dee2e6"/>
+  <text x="210" y="95" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#495057">Campaign Phase Distribution</text>
+  <circle cx="210" cy="180" r="60" fill="none" stroke="#e8f5e9" stroke-width="40"/> <!-- Opt -->
+  <path d="M210 120 A 60 60 0 0 1 270 180" fill="none" stroke="#fff3e0" stroke-width="40"/> <!-- Learn -->
+  <path d="M210 120 A 60 60 0 0 0 150 180" fill="none" stroke="#e3f2fd" stroke-width="40"/> <!-- Init -->
+  <text x="320" y="160" font-family="Arial" font-size="10" fill="#1b5e20">Optimization (65%)</text>
+  <text x="320" y="180" font-family="Arial" font-size="10" fill="#e65100">Learning (20%)</text>
+  <text x="320" y="200" font-family="Arial" font-size="10" fill="#1565c0">Init (15%)</text>
+
+  <!-- Panel 2: pCVR Hit Rate (Line) -->
+  <rect x="420" y="70" width="750" height="240" rx="5" fill="white" stroke="#dee2e6"/>
+  <text x="795" y="95" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#495057">Triton pCVR Scored vs. Fallback</text>
+  <polyline points="450,280 500,180 550,200 600,150 650,160 700,120 750,130 800,110 850,120 900,100 950,110 1000,105 1050,115 1100,110" fill="none" stroke="#1b5e20" stroke-width="3"/>
+  <text x="1110" y="105" font-family="Arial" font-size="10" fill="#1b5e20">pCVR Hits (94%)</text>
+  <polyline points="450,280 500,270 550,275 600,265 650,270 700,275 750,272 800,278 850,275 900,278" fill="none" stroke="#bf360c" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="910" y="275" font-family="Arial" font-size="10" fill="#bf360c">Cold Start Fallback (6%)</text>
+
+  <!-- Panel 3: Bid Floor Frequency (Bar) -->
+  <rect x="30" y="340" width="1140" height="230" rx="5" fill="white" stroke="#dee2e6"/>
+  <text x="600" y="365" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#495057">Bid Floor Clamping Frequency (TROAS_BELOW_FLOOR)</text>
+  <rect x="100" y="520" width="40" height="30" fill="#4a148c"/>
+  <rect x="200" y="480" width="40" height="70" fill="#4a148c"/>
+  <rect x="300" y="500" width="40" height="50" fill="#4a148c"/>
+  <rect x="400" y="420" width="40" height="130" fill="#bf360c"/> <!-- Peak -->
+  <rect x="500" y="490" width="40" height="60" fill="#4a148c"/>
+  <rect x="600" y="510" width="40" height="40" fill="#4a148c"/>
+  <rect x="700" y="530" width="40" height="20" fill="#4a148c"/>
+  <rect x="800" y="520" width="40" height="30" fill="#4a148c"/>
+  <rect x="900" y="515" width="40" height="35" fill="#4a148c"/>
+  <rect x="1000" y="525" width="40" height="25" fill="#4a148c"/>
+  
+  <text x="420" y="410" font-family="Arial" font-size="10" text-anchor="middle" fill="#bf360c" font-weight="bold">Peak Floor Hit (Lunch Time)</text>
+  
+  <line x1="80" y1="550" x2="1120" y2="550" stroke="#495057" stroke-width="1"/>
+  <text x="120" y="565" font-family="Arial" font-size="9" text-anchor="middle">00:00</text>
+  <text x="420" y="565" font-family="Arial" font-size="9" text-anchor="middle">12:00</text>
+  <text x="1020" y="565" font-family="Arial" font-size="9" text-anchor="middle">23:00</text>
+
+</svg>
