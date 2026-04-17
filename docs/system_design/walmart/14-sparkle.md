@@ -138,6 +138,25 @@ graph TD
 | `ccm.configs.dir` | CCM config directory |
 | `scm.server.access.enabled` | SCM integration toggle |
 | `spring.profiles.active` | `local`, `stg`, `prod`, `wcnp_*` |
+| `efs_sdk_env` | EFS (Element Feature Store) SDK environment; JVM system property added to all deploy stages (Apr 2026) |
+| `localDcUPS` | Local DC UPS (User Preference Service) endpoint; JVM system property for Cassandra DC-aware routing |
+
+### EFS SDK Integration (Apr 2026)
+
+Sparkle now integrates with the **Element Feature Store (EFS) SDK** to fetch the model registry
+at service startup. This enables the scoring service to discover active model configurations
+(model IDs, feature sets, thresholds) without requiring a code deploy.
+
+**JVM system properties added to all deploy stages (`sr.yaml`):**
+```
+-Defs_sdk_env=<env>
+-DlocalDcUPS=<dc-endpoint>
+```
+
+The `EFS Integration to fetch registry on bootup` change means that on pod startup, Sparkle
+contacts the EFS SDK to load the current model registry, which determines which ML models are
+active for CTR/CVR scoring. Previously this was baked into the Spring application context.
+Akeyless secrets integration is also live in non-prod environments (production pending).
 
 ---
 

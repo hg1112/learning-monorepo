@@ -153,6 +153,39 @@ graph TD
 | US West | `ss-davinci-triton-prod.ss-davinci-wmt.uswest-prod-az-328.cluster.k8s.westus2.us.walmart.net` |
 | US East | `ss-davinci-triton-prod.ss-davinci-wmt.eus2-prod-a10.cluster.k8s.us.walmart.net` |
 
+### Active Model Registry (prod CCM — Apr 2026)
+
+| Model ID | Output Tensors | Batch Size | Feature Inputs | Notes |
+|----------|---------------|------------|---------------|-------|
+| `universal_r1_ensemble_model_relevance_v1` | `["score"]` | 80 | `adName` | Stable DeBERTa baseline |
+| `universal_r1_ensemble_model_relevance_deberta_base` | `["score"]` | 16 | `adName` | DeBERTa base variant |
+| `universal_l1_r1_ensemble_model_relevance_v1` | `["score", "l1_rank_score"]` | 16 | 20 features (see below) | **L1 ranker A/B variant 1** |
+| `universal_l1_r1_ensemble_model_relevance_v1_rel` | `["score", "l1_rank_score"]` | 16 | 20 features | **L1 ranker A/B variant 2** |
+| `universal_l1_r1_ensemble_model_relevance_v1_25_75` | `["score", "l1_rank_score"]` | 16 | 20 features | **L1 ranker A/B variant 3 (25/75 split)** |
+
+**L1 Ranker model features** (20 inputs via `feast.model.features` CCM key):
+
+| Feature | Type | Default | Description |
+|---------|------|---------|-------------|
+| `adName` | `BYTES` | — | Ad title text |
+| `adWmtConvRate30dV2` | `FP32` | 0.0 | 30-day WMT conversion rate |
+| `adWpaCtr30d` | `FP32` | 0.0 | 30-day WPA CTR |
+| `adWpaCtr30dPageSearch` | `FP32` | 0.0 | 30-day CTR on search page |
+| `adWpaCtr30dPageSearchIngrid` | `FP32` | 0.0 | In-grid search CTR |
+| `adWpaCtr30dPageSearchIngridBkt1/2/4` | `FP32` | 0.0 | In-grid CTR by bucket (1, 2, 4) |
+| `adOrgCtr30d` | `FP32` | 0.0 | 30-day organic CTR |
+| `adSiteQltyScoreNbr` | `FP32` | 0.0 | Site quality score |
+| `adPriceAmt` | `FP32` | 0.0 | Ad item price |
+| `adWpaAtcrMixSearch` / `adWpaCtrMixSearch` | `FP32` | 0.0 | Mixed search ATCR / CTR |
+| `adWpaAtcrMixItem` | `FP32` | 0.0 | Mixed item ATCR |
+| `adOrderToProdViewRatio4Wk` / `12Wk` | `FP32` | 0.0 | Order-to-view ratio (4w / 12w) |
+| `adWpaSpend1d` / `7d` | `FP32` | 0.0 | 1-day / 7-day WPA spend |
+| `adWpaViews1d` / `7d` | `FP32` | 0.0 | 1-day / 7-day WPA views |
+
+The L1 ranker models return **dual output tensors**: `score` (DeBERTa relevance, 0.0–1.0) and
+`l1_rank_score` (L1 ranking signal). The sp-adserver-feast service has a dedicated feature service
+for these L1 variants (`l1-var` branch → merged to main).
+
 ---
 
 ## 7. Example Scenario — Vector Generation with 4-Level Cache

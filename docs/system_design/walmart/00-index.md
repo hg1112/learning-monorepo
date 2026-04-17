@@ -1,7 +1,7 @@
 # Walmart Sponsored Products — Architecture Documentation Index
 
-> **Scope:** 20 repos · 17 services + 3 infrastructure/ML layers · 5 deep-dive flows (TROAS, Ad Relevance, Feast, DaVinci, Darwin) · 1 team deep-dive (InSSPire)
-> **Generated:** Wibey CLI — March 2026
+> **Scope:** 22 repos · 19 services + 3 infrastructure/ML layers · 5 deep-dive flows (TROAS, Ad Relevance, Feast, DaVinci, Darwin) · 1 team deep-dive (InSSPire)
+> **Generated:** Wibey CLI — March 2026 · **Updated:** April 2026 (CARADS-46176, L1 Ranker A/B, roar-v2, CTS)
 > **Format:** Mermaid-compatible (Notion import ready)
 
 ---
@@ -37,6 +37,8 @@
 | 24 | [24-davinci-deep-dive.md](./24-davinci-deep-dive.md) | DaVinci ML Platform Deep Dive | davinci, element-davinci |
 | 25 | [25-darwin.md](./25-darwin.md) | Darwin: Ad Retrieval Service | darwin (ss-darwin-wmt) |
 | 26 | [26-insspire-team.md](./26-insspire-team.md) | InSSPire Team: ML Inference Platform | sparkle, davinci, element-davinci, element-ss-inference, sp-adserver-feast |
+| 27 | [27-roar-v2.md](./27-roar-v2.md) | ROAR: Real-Time Ad Event Stream Processor | roar-v2 |
+| 28 | [28-cts.md](./28-cts.md) | CTS: Campaign Telemetry Service (UI Search) | cts |
 
 ---
 
@@ -139,6 +141,8 @@ graph TB
 | 17 | Batch Feature Pipeline | element-adserver-feast | Python 3.11 | PySpark 3.3 + Feast | Batch feature engineering on Dataproc | BigQuery, GCS, Cassandra | — |
 | 18 | ML Inference (Current) | element-davinci | Python 3 | Triton Server 24.12 | GPU inference on H100 (16 prod replicas) | Azure Blob (models) | — |
 | 19 | ML Inference (Legacy) | element-ss-inference | Python 3 | Triton Server 22.12 | Legacy V100-based semantic search | Azure Blob (models) | — |
+| 27 | Ad Event Stream | roar-v2 | Java 17 | Spring Boot + Spring Cloud Stream | Kafka → GCS/Druid event pipeline; Hive UDFs for offline processing | GCS, Druid | Both |
+| 28 | UI Telemetry Search | cts | Java 17 | Spring Boot + Elasticsearch | Advertiser/campaign search for Walmart Connect UI | Elasticsearch, Azure SQL | Consumer |
 
 ---
 
@@ -176,12 +180,15 @@ graph LR
 
 | Topic | Producer | Consumer | Payload | Cluster |
 |-------|----------|----------|---------|---------|
-| campaign-events | darpa | radpub-v2 | Campaign CRUD protobuf | Standard |
-| click-events | sp-crs | sp-buddy | ClickEvent protobuf | SOX (SCUS/WUSE2) |
+| campaign-events | darpa | radpub-v2, cts | Campaign CRUD protobuf | Standard |
+| click-events | sp-crs | sp-buddy, roar-v2 (AniviaStream) | ClickEvent protobuf | SOX (SCUS/WUSE2) |
 | budget-events | sp-buddy | midas-spector | BudgetStatus | Standard |
 | ad-serving-log-v1 | midas-spade | Analytics / downstream | AdServingRequest v1 | GCP Kafka |
 | ad-serving-log-v2 | midas-spade | Analytics / downstream | AdServingRequest v2 | GCP Kafka |
 | feature-log | abram | ML training pipelines | AdItemVariantScore | GCP Kafka |
+| wpa-clicks-topic | WPA / Glass | roar-v2 (ClicksStream) | WpaEvent / WpaActivity | Standard |
+| wpa-events-topic | WPA / Glass | roar-v2 (EventStream) | WpaEvent | Standard |
+| sp_abram_request_logs | abram | roar-v2 (PulseStream), Analytics | Full auction request + TROAS params | GCP Kafka |
 
 ---
 
@@ -264,6 +271,7 @@ graph TD
 | 16 | swag tenant-routing logic for newer WMX Ads API path vs legacy midas-spade | Partially known | 10 |
 | 17 | TROAS pCVR / pVPC Triton model training pipeline and retraining cadence | Unknown | 21 |
 | 18 | TROAS Beta distribution α/β update mechanism (online learning vs batch) | Assumed batch | 21 |
+| 18b | TROAS LEARNING phase now uses optimization algo when `enableOptAlgoForLearningPhase=true` | **Resolved** (CARADS-46176, Apr 2026) | 21 |
 | 19 | DeBERTa Java tokenizer CCM rollout status (deployed to prod?) | Unknown — design doc stage | 22, 24 |
 | 20 | Feast Feature View full schema (all column names for SP production feature set) | Partially known | 23 |
 | 21 | DaVinci offline cluster provisioning details (GPU count, Triton version) | Unknown | 24 |
@@ -275,6 +283,9 @@ graph TD
 | 27 | TTBv3 A/B neutral — ranker model revision timeline | In progress | 22, 26 |
 | 28 | CVR model + CTR AdScore rollout date (multi-task model decision) | May 2026 target | 26 |
 | 29 | InSSPire ML Automation Tool production delivery date | CARADS-41445 | 26 |
+| 30 | L1 ranker variants (`*_rel`, `*_25_75`) A/B outcome — winner selection | Active A/B (Apr 2026) | 15, 26 |
+| 31 | sp-ace multi-cell experiment CCM rollout status | CARADS-45937 merged; CCM gate pending | 06 |
+| 32 | Sparkle Akeyless secrets — prod rollout status | Non-prod done; prod pending | 14 |
 
 ---
 

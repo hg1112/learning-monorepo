@@ -45,11 +45,11 @@ graph LR
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/v1/experiments` | Create experiment |
-| GET | `/v1/experiments` | List experiments |
+| POST | `/v1/experiments` | Create experiment (supports multi-cell, CARADS-45937) |
+| GET | `/v1/experiments` | List experiments (with pagination) |
 | GET | `/v1/experiments/{id}` | Get experiment details |
 | PUT | `/v1/experiments/{id}/state` | Transition experiment state |
-| GET | `/v1/experiments/{id}/history` | Audit history |
+| GET | `/v1/experiments/{id}/history` | Audit history (Hibernate Envers) |
 | POST | `/v1/experiments/{id}/clone` | Clone experiment |
 | POST | `/v1/experiments/{id}/buckets` | Create bucket |
 | PUT | `/v1/experiments/{id}/buckets/{bucketId}/state` | Update bucket state |
@@ -90,6 +90,12 @@ erDiagram
     timestamp startTime
     timestamp endTime
     string tenant
+    int cellCount "Multi-cell support (CARADS-45937)"
+    string incrementalityType "SearchIncrementalityExperiment type"
+    float controlAllocationPercent "Control cell allocation"
+    boolean multiCellEnabled "Multi-cell flag"
+    string cellAssignmentStrategy "How traffic is split across cells"
+    string analysisUnit "Experiment unit (CAMPAIGN / AD_GROUP)"
   }
   BUCKETS {
     long id PK
@@ -138,6 +144,7 @@ graph TD
 | `cache.timeout.ace` | `300` | Experiment cache TTL (seconds) |
 | `readonly.instance` | `false` | Read-only mode |
 | `sublayer.max.experiments` | `1` | Max concurrent experiments per sublayer |
+| `multi.cell.experiments.enabled` | `false` | Enable multi-cell experiment support (CARADS-45937) |
 | `default.page.size` | `50` | Default pagination size |
 | `ace.encryption.enabled` | `true` | Encrypt sensitive fields |
 

@@ -64,9 +64,25 @@ graph LR
 | GET | `/v2/budgets/campaigns/{campaignId}/status` | JSON | Get campaign budget status (v2) |
 | PUT | `/v1/budgets/fix/campaigns/{campaignId}` | JSON | Fix budget discrepancies |
 | POST | `/v1/budgets/reallocate` | Protobuf | Reallocate daily budget |
+| **POST** | **`/v1/budgets/experiments/validate-splits`** | **JSON** | **Validate budget splits for an experiment (CARADS-41748)** |
 | GET | `/health` | JSON | Kubernetes health check |
 
 **Protobuf contract:** Uses `sp-api-proto:0.0.17` shared proto definitions (`CampaignBudgetCreateRequest`, `DailyCampaignBudgetCreateRequest`).
+
+### Budget Splits Validation (CARADS-41748 — live in prod, Mar 2026)
+
+`POST /v1/budgets/experiments/validate-splits` — validates whether the campaigns in a budget
+experiment have been correctly split. Returns a `BudgetValidationResponse` with:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `splitCount` | int | Number of campaigns that have been correctly budget-split |
+| `unsplitCount` | int | Number of campaigns that remain unsplit |
+| `campaignIds` | List\<String\> | Campaign IDs in the experiment |
+
+**`BudgetValidatorService`** performs batch campaign budget lookup via the repository layer and
+checks each campaign's split status. The multiple-budget experiment feature (parallel budget
+validation across buckets) is now **fully enabled in prod and prod-RO**.
 
 ---
 

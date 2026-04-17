@@ -383,8 +383,8 @@ BigQuery (ads event source)
 | Initiative | Models Affected | Services Impacted | Architecture Change |
 |-----------|----------------|-------------------|-------------------|
 | **TTBv3** (A/B) | `ttb_v3_query`, `ttb_v3_item` | element-davinci, Davinci, Vespa | New Triton ensemble; new Vespa index built from v3 embeddings |
-| **DeBERTa Big Relevance** (launched) | `universal_r1_*_deberta_base_batch` | element-davinci, Davinci | DeBERTa tokenizer as separate Triton ensemble step; Davinci cache critical for throughput |
-| **L1 Neural Ranker** (1% A/B) | `l1_ranker_*` | element-davinci, Davinci | New ranking stage between CTR/CVR scoring and final auction in Abram |
+| **DeBERTa Big Relevance** (launched Mar 2026) | `universal_r1_*_deberta_base_batch` | element-davinci, Davinci | DeBERTa tokenizer as separate Triton ensemble step; Davinci cache critical for throughput |
+| **L1 Neural Ranker — 3 A/B variants** (live Apr 2026) | `universal_l1_r1_ensemble_model_relevance_v1`, `*_rel`, `*_25_75` | element-davinci, Davinci, sp-adserver-feast | Dual output `[score, l1_rank_score]`; 20 behavioral features vs text-only; batch size 16; dedicated feature service added to sp-adserver-feast |
 | **Pairwise Ranking** (A/B) | `search-middle-252-pw-*` | Sparkle | New MLeap model; pairwise loss training; no Triton dependency |
 | **CVR model + CTR in AdScore** | CTR + CVR Triton models | Sparkle, Abram | 50% Sparkle scale-up needed; multi-task model under evaluation to merge CTR+CVR into one Triton call |
 | **User Features via UPS** | CTR models + new user tower | sp-adserver-feast, Sparkle | New feature view: `customerId` entity; EFS SDK Java integration; feature ingestion via IDC DS pipeline |

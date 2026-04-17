@@ -382,9 +382,11 @@ SWAG has a first-class experimentation layer used to roll out new ad formats, ra
 - Example: bucket key `FUNGIBLE_DISPLAY_XPA` activates the `GroupingServiceManager` path for Brand Shop Spotlight / Fungible Display fallback
 - Bucket key `SKYLINE_EXCL_V2` activates the Skyline exclusion lookup via CCM configuration
 
-**Recent experiment activations:**
-- **Brand Shop Spotlight / Fungible Display fallback (XPA):** When a user is bucketed into the XPA experiment, `GroupingServiceManager` assembles fungible ad modules that can be filled by either a Sponsored Brand or a Display ad depending on inventory availability, maximizing fill rate
-- **Skyline exclusion lookup:** Controls which ad unit positions are excluded from the Skyline layout; the exclusion set is loaded from CCM rather than hardcoded, allowing dynamic updates without deployment
+**Recent experiment activations (Apr 2026):**
+- **Brand Shop Spotlight (live):** `GroupingServiceManager` extended to handle fungible ad modules for Brand Shop Spotlight placements. Non-prod CCM values added to support the new module type. The `GroupingServiceManager` assembles ad units that can render as a Brand Shop Spotlight or fall back to a standard Sponsored Brand.
+- **Fungible Display fallback — XPA A/B test (active):** When a user is bucketed into the XPA experiment (`FUNGIBLE_DISPLAY_XPA` bucket key), `GroupingServiceManager` assembles fungible ad modules that can be filled by either a Sponsored Brand or a Display ad depending on inventory availability, maximizing fill rate.
+- **Skyline exclusion lookup:** Controls which ad unit positions are excluded from the Skyline layout; the exclusion set is loaded from CCM rather than hardcoded, allowing dynamic updates without deployment.
+- **Store Mode Screen `rs` parameter:** `rs` query parameter added to store mode screen query string via CCM configs for the `/fs` (Federated Search) endpoint.
 
 ---
 

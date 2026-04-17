@@ -72,19 +72,19 @@ can access it without an additional database round-trip.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> INITIALIZATION : Advertiser enables TROAS\n(darpa validates + persists targetRoas)
+    [*] --> INITIALIZATION : Advertiser enables TROAS
 
-    INITIALIZATION --> LEARNING : Campaign goes live;\nThompson Sampling active\n(suggested bid = CPC from ad_item_campaign)
+    INITIALIZATION --> LEARNING : Campaign goes live; Thompson Sampling or ROAS bid active
 
-    LEARNING --> LEARNING_PAUSED : Budget depleted\nor manual pause
+    LEARNING --> LEARNING_PAUSED : Budget depleted or manual pause
 
-    LEARNING_PAUSED --> LEARNING : Budget restored\nor manual resume
+    LEARNING_PAUSED --> LEARNING : Budget restored or manual resume
 
-    LEARNING --> OPTIMIZATION : Sufficient conversion data;\npCVR + pVPC models trained;\nPRPC bidder activated
+    LEARNING --> OPTIMIZATION : Sufficient data; pCVR and pVPC models trained; PRPC activated
 
-    OPTIMIZATION --> TRANSITION : Experiment applied\nor strategy switch initiated
+    OPTIMIZATION --> TRANSITION : Experiment applied or strategy switch
 
-    TRANSITION --> [*] : Final phase — bids drained\ngracefully (ROAS-only wind-down)
+    TRANSITION --> [*] : Final phase — ROAS wind-down
 ```
 
 ### Phase Descriptions
@@ -92,8 +92,8 @@ stateDiagram-v2
 | Phase | Bidding Strategy | Bid Source | Data Requirement |
 |-------|-----------------|------------|-----------------|
 | `INITIALIZATION` | Suggested bid (ROAS-based) | `CPC` from `ad_item_campaign` table | None — uses CCM defaults |
-| `LEARNING` | Thompson Sampling (Beta distribution) | Sample from `sampleDistributions` price points | Partial — still collecting conversions |
-| `LEARNING_PAUSED` | Frozen — no bids emitted | — | Budget or manual pause condition |
+| `LEARNING` | **CCM-gated:** ROAS-based bid (if `enableOptAlgoForLearningPhase=true` + bidPrime present) **or** Thompson Sampling (Beta distribution) as fallback | bidPrime (ROAS path) or `sampleDistributions` price points (Thompson) | Partial — still collecting conversions |
+| `LEARNING_PAUSED` | ROAS-based if bidPrime present; else Thompson Sampling | `bidPrime × dayPartFactor × pacingFactor` or Beta sample | Budget or manual pause condition |
 | `OPTIMIZATION` | Unified Bidder or Weighted PRPC | `w1×roasBid + w2×pRPCBid` or Unified formula | Sufficient pCVR + pVPC model data |
 | `TRANSITION` | ROAS-based only (wind-down) | `bidPrime × dayPartFactor × pacingFactor` | Experiment applied; draining period |
 
@@ -364,11 +364,17 @@ flowchart TD
 
     B -- INITIALIZATION --> C["computeRoasBasedBid\nroasBid = bidPrime × dayPartFactor × pacingFactor\n(bidPrime = CPC from ad_item_campaign)"]
 
-    B -- LEARNING --> D{sampleDistributions\npresent?}
-    D -- Yes --> E["computeThompsonBid\nFor each (αᵢ, βᵢ, priceᵢ): sample xᵢ ~ Beta(αᵢ,βᵢ)\nSelect priceᵢ where xᵢ is maximum\nEmit TROAS_THOMPSON_HITS"]
-    D -- No --> F[Emit TROAS_NO_SD\nUse CCM default distributions\nor fall back to roasBid]
+    B -- LEARNING --> OPT_FLAG{enableOptAlgo\nForLearningPhase?}
+    OPT_FLAG -- true --> BP_CHECK{bidPrime\npresent?}
+    BP_CHECK -- Yes --> OPT_L["computeRoasBasedBid + clamp\nEmit TROAS_OPTIMIZATION_FOR_LEARNING"]
+    BP_CHECK -- No --> LEARN_FB["computeLearningBid\n(Thompson or bid CPC)\nEmit TROAS_BID_PRIME_MISSING_LEARNING"]
+    OPT_FLAG -- false --> D{sampleDistributions\npresent?}
+    D -- Yes --> E["computeThompsonBid\nFor each (alpha, beta, price): sample x ~ Beta(a,b)\nSelect price where x is maximum\nEmit TROAS_THOMPSON_HITS\nEmit TROAS_LEARNING_FOR_LEARNING"]
+    D -- No --> F["Emit TROAS_NO_SD\nUse CCM default distributions\nor fall back to roasBid"]
 
-    B -- LEARNING_PAUSED --> G[Return empty — no bid emitted\nItem excluded from auction]
+    B -- LEARNING_PAUSED --> LP_CHECK{bidPrime\npresent?}
+    LP_CHECK -- Yes --> LP_ROAS["computeRoasBasedBid + clamp\n(computeBidWithBidPrimeCheck)"]
+    LP_CHECK -- No --> LP_LEARN["computeLearningBid\nEmit TROAS_BID_PRIME_MISSING_LEARNING_PAUSED"]
 
     B -- OPTIMIZATION --> H{unifiedBidder\nenabled?}
     H -- Yes --> I["computeUnifiedBidderBasedBid\ngain = scalingCoeff × (pCVR − μ) / σ\nclippedGain = clip(gain, lo, hi)\nunifiedBid = roasBid × (1 + clippedGain)\nEmit TROAS_UNIFIED_BIDDER_CALLS"]
@@ -376,7 +382,7 @@ flowchart TD
 
     B -- TRANSITION --> C
 
-    C & E & F & I & J --> K["calculateTroasCPC\nfinalCPC = round(clamp(bid, bb.low, bb.high), 4dp)\nDefault: clamp([0.20, 5.00])"]
+    C & OPT_L & LEARN_FB & E & F & LP_ROAS & LP_LEARN & I & J --> K["calculateTroasCPC\nfinalCPC = round(clamp(bid, bb.low, bb.high), 4dp)\nDefault bounds: 0.20 to 5.00"]
     K --> L[finalCPC returned\nper candidate item]
 ```
 
@@ -392,6 +398,39 @@ run in **parallel** and are merged before the auction.
 
 Non-full-score items fall through to the ROAS-based bid formula regardless of the campaign phase,
 since the model-dependent formulas (PRPC, Unified Bidder) require a valid pCVR score.
+
+### LEARNING Phase Optimization Algorithm (CARADS-46176 — Apr 2026)
+
+A new CCM flag `enableOptAlgoForLearningPhase` (in `GeneralProperties`) changes bidding behavior
+in the `LEARNING` phase. When enabled, the system prefers ROAS-based bidding over Thompson Sampling
+as soon as `bidPrime` becomes available for a campaign.
+
+**Shared helper introduced:** `computeBidWithBidPrimeCheck()` — encapsulates the logic used by
+both `LEARNING` (new path) and `LEARNING_PAUSED`:
+
+```
+computeBidWithBidPrimeCheck(troasBidParams, defaultBidBound, ...):
+  if bidPrime is empty:
+      onBidPrimeMissing.run()         // emit counter
+      return computeLearningBid(...)  // Thompson or bid CPC
+  else:
+      cpc = computeRoasBasedBid(...)  // bidPrime × dpf × pf
+      bound = bidBound or (onBidBoundMissing → defaultBidBound)
+      return calculateTroasCPC(cpc, bound)
+```
+
+**New counters (TroasCounters):**
+
+| Counter | Emitted When |
+|---------|-------------|
+| `TROAS_LEARNING_FOR_LEARNING` | Old learning path taken in LEARNING phase (Thompson / bid CPC) |
+| `TROAS_OPTIMIZATION_FOR_LEARNING` | New optimization path taken in LEARNING phase (ROAS-based) |
+| `TROAS_BID_PRIME_MISSING_LEARNING` | bidPrime absent in LEARNING new path; fell back to Thompson |
+| `TROAS_BID_BOUNDS_MISSING_LEARNING` | bidBound absent in LEARNING new path; used CCM default |
+| `TROAS_BID_PRIME_MISSING_LEARNING_PAUSED` | bidPrime absent in LEARNING_PAUSED; fell back to Thompson |
+| `TROAS_BID_BOUNDS_MISSING_LEARNING_PAUSED` | bidBound absent in LEARNING_PAUSED; used CCM default |
+
+**CCM key:** `troas.enableOptAlgoForLearningPhase` (boolean, default `false`) in `GeneralProperties`.
 
 ---
 
@@ -802,7 +841,7 @@ stateDiagram-v2
     IN_PROGRESS --> LEARNING_PAUSED : Budget depleted mid-experiment
     LEARNING_PAUSED --> IN_PROGRESS : Budget restored
     IN_PROGRESS --> READY_TO_REVIEW : N days elapsed; reports generated
-    READY_TO_REVIEW --> APPLIED : Advertiser applies experiment\n(control migrated to TROAS)
+    READY_TO_REVIEW --> APPLIED : Advertiser applies; control migrated to TROAS
     READY_TO_REVIEW --> ENDED : Advertiser ends without applying
     SCHEDULED --> CANCELED : Advertiser cancels before start
     IN_PROGRESS --> CANCELED : Advertiser cancels mid-run
