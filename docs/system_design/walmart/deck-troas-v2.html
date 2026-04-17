@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TROAS Smart Bidding — Uber Round 3</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:   #0055aa; --dblue: #003580; --lblue: #e8f0fe;
+  --green:  #1b5e20; --lgreen:#e8f5e9;
+  --orange: #bf360c; --lorange:#fbe9e7;
+  --purple: #4a148c; --lpurple:#f3e5f5;
+  --teal:   #004d40; --lteal: #e0f2f1;
+  --grey:   #37474f; --lgrey: #f5f5f5;
+  --text:   #1a1a2e; --muted: #546e7a;
+  --white:  #ffffff; --accent:#1565c0;
+  --sw: 1280px; --sh: 720px;
+}
+html,body { width:100%; height:100%; background:#111827;
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif; overflow:hidden; }
+#deck { position:fixed; inset:0; overflow:auto; }
+#scroll-inner { position:relative; /* sized explicitly by JS */ }
+#scaler { width:var(--sw); height:var(--sh); transform-origin:top left; position:absolute; }
+
+/* ── SLIDES ── */
+.slide { position:absolute; inset:0; width:var(--sw); height:var(--sh); overflow:hidden;
+  display:none; background:var(--white); padding:44px 60px 36px; flex-direction:column;
+  transition:opacity 0.25s ease; }
+.slide.active { display:flex; }
+.slide.fade-in { animation:fadeIn 0.25s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── VARIANTS ── */
+.title-slide { background:linear-gradient(135deg,#0a2463 0%,#003580 55%,#1565c0 100%);
+  color:var(--white); align-items:flex-start; justify-content:center; gap:12px; }
+.section-break { background:linear-gradient(135deg,#e8f0fe 0%,#f3e5f5 100%);
+  align-items:center; justify-content:center; text-align:center; }
+.dark-slide { background:#0a2463; color:var(--white); }
+
+/* ── TYPE ── */
+.slide-tag { font-size:11px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase;
+  opacity:0.6; margin-bottom:4px; }
+h1 { font-size:46px; font-weight:800; line-height:1.1; color:var(--white); }
+h2 { font-size:28px; font-weight:700; color:var(--accent); margin-bottom:16px;
+  border-bottom:3px solid var(--accent); padding-bottom:6px; }
+.dark-slide h2 { color:#90caf9; border-color:#90caf9; }
+.section-break h2 { border:none; font-size:38px; color:var(--accent); }
+h3 { font-size:16px; font-weight:600; color:var(--accent); margin-bottom:6px; }
+p,li { font-size:15px; line-height:1.55; color:var(--text); }
+.dark-slide p,.dark-slide li { color:#e3f2fd; }
+.subtitle { font-size:20px; opacity:.85; }
+.byline { font-size:14px; opacity:.55; margin-top:20px; }
+ul { list-style:none; padding:0; display:flex; flex-direction:column; gap:6px; }
+ul li::before { content:"▸ "; color:var(--accent); font-weight:700; }
+.dark-slide ul li::before { color:#90caf9; }
+
+/* ── LAYOUT ── */
+.cols   { display:grid; gap:20px; flex:1; min-height:0; }
+.c2     { grid-template-columns:1fr 1fr; }
+.c3     { grid-template-columns:1fr 1fr 1fr; }
+.c6040  { grid-template-columns:3fr 2fr; }
+.img65l { grid-template-columns:13fr 7fr; }
+.img65r { grid-template-columns:7fr 13fr; }
+.col    { display:flex; flex-direction:column; gap:10px; min-height:0; overflow:hidden; }
+.col>img { flex:1; min-height:0; width:100%; object-fit:contain; border-radius:8px; }
+.flex1  { flex:1; min-height:0; }
+.supp   { gap:7px; }
+.supp .card { padding:9px 12px; }
+.supp h3 { font-size:13px; margin-bottom:3px; }
+.supp p,.supp li { font-size:12px; line-height:1.4; }
+.supp ul { gap:4px; }
+.supp .formula { font-size:11px; padding:9px 12px; line-height:1.6; }
+
+/* ── CARDS ── */
+.card { background:var(--lgrey); border-radius:10px; padding:14px 18px; border-left:4px solid var(--accent); }
+.card.green  { border-color:var(--green);  background:var(--lgreen); }
+.card.orange { border-color:var(--orange); background:var(--lorange); }
+.card.purple { border-color:var(--purple); background:var(--lpurple); }
+.card.teal   { border-color:var(--teal);   background:var(--lteal); }
+.card.grey   { border-color:var(--muted);  background:var(--lgrey); }
+.card h3 { margin-bottom:4px; font-size:15px; }
+.card.green h3  { color:var(--green); }
+.card.orange h3 { color:var(--orange); }
+.card.purple h3 { color:var(--purple); }
+.card.teal h3   { color:var(--teal); }
+.card.grey h3   { color:var(--muted); }
+
+/* ── PHASE BADGES ── */
+.phase { display:inline-flex; align-items:center; gap:7px; padding:5px 12px;
+  border-radius:20px; font-size:12px; font-weight:700; letter-spacing:0.5px; white-space:nowrap; }
+.phase .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+.phase.init   { background:#e3f2fd; color:#1565c0; }
+.phase.learn  { background:#fff3e0; color:#e65100; }
+.phase.pause  { background:#fce4ec; color:#c62828; }
+.phase.opt    { background:#e8f5e9; color:#1b5e20; }
+.phase.trans  { background:#f3e5f5; color:#6a1b9a; }
+
+/* ── FLOW ── */
+.flow { display:flex; align-items:center; gap:0; flex-wrap:wrap; row-gap:6px; }
+.flow-box { background:var(--lblue); border:1.5px solid var(--accent); border-radius:6px;
+  padding:5px 10px; font-size:12px; font-weight:600; color:var(--accent); white-space:nowrap; }
+.flow-arrow { color:var(--muted); font-size:16px; padding:0 3px; }
+
+/* ── FORMULA ── */
+.formula { background:#0d1b2a; color:#e0f2f1; border-radius:8px; padding:12px 18px;
+  font-family:'Courier New',monospace; font-size:14px; line-height:1.7; }
+.formula .fn  { color:#80cbc4; font-weight:700; }
+.formula .var { color:#ffcc80; }
+.formula .op  { color:#ef9a9a; }
+.formula .cmt { color:#546e7a; font-style:italic; font-size:12px; }
+
+/* ── TABLE ── */
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:var(--accent); color:white; padding:7px 10px; text-align:left; font-size:12px; }
+td { padding:6px 10px; border-bottom:1px solid #e0e0e0; vertical-align:top; }
+tr:nth-child(even) td { background:var(--lgrey); }
+.dark-slide th { background:#1565c0; }
+.dark-slide td { border-color:#1e3a5f; color:#e3f2fd; }
+.dark-slide tr:nth-child(even) td { background:rgba(255,255,255,0.05); }
+
+/* ── STATS ── */
+.stat { text-align:center; }
+.stat .num { font-size:34px; font-weight:800; color:var(--white); line-height:1; }
+.stat .lbl { font-size:11px; color:rgba(255,255,255,0.6); margin-top:3px; font-weight:600;
+  text-transform:uppercase; letter-spacing:0.5px; }
+.title-slide .stat { background:rgba(255,255,255,0.12); border-radius:10px; padding:12px 22px; }
+
+/* ── TAG ── */
+.tag { display:inline-block; background:var(--lblue); color:var(--accent);
+  border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; }
+.tag.red    { background:var(--lorange); color:var(--orange); }
+.tag.green  { background:var(--lgreen);  color:var(--green); }
+.tag.purple { background:var(--lpurple); color:var(--purple); }
+.tag.grey   { background:var(--lgrey);   color:var(--muted); }
+
+/* ── SECTION BAR ── */
+.section-bar { display:inline-flex; align-items:center; gap:6px; background:var(--lblue);
+  color:var(--accent); border-radius:4px; padding:3px 10px; font-size:10px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; align-self:flex-start; }
+.dark-slide .section-bar { background:rgba(144,202,249,0.15); color:#90caf9; }
+
+/* ── GUARD ROW ── */
+.guard-row { display:flex; align-items:flex-start; gap:8px; padding:5px 0;
+  border-bottom:1px solid #eee; font-size:13px; }
+.guard-row:last-child { border-bottom:none; }
+.guard-code { font-family:monospace; font-size:11px; background:#f4f4f4;
+  padding:1px 6px; border-radius:4px; color:var(--orange); white-space:nowrap;
+  flex-shrink:0; margin-top:2px; }
+
+/* ── PROGRESS & CONTROLS ── */
+#progress { position:fixed; bottom:0; left:0; height:3px; background:#90caf9;
+  transition:width 0.3s ease; z-index:100; }
+#controls { position:fixed; bottom:14px; right:18px; display:flex; gap:6px; z-index:100; }
+#controls button { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25);
+  color:white; width:34px; height:34px; border-radius:6px; cursor:pointer; font-size:15px;
+  transition:background 0.15s; }
+#controls button:hover { background:rgba(255,255,255,0.28); }
+#slide-num { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+  color:rgba(255,255,255,0.45); font-size:11px; font-family:monospace; z-index:100; }
+.spacer { flex:1; }
+.note { font-size:11px; color:var(--muted); font-style:italic; }
+.mono { font-family:'Courier New',monospace; font-size:12px; background:#f4f4f4;
+  padding:1px 4px; border-radius:3px; color:#333; }
+.bold { font-weight:700; }
+
+/* ── NOTES PANEL ── */
+#notes-panel { position:fixed; bottom:0; left:0; right:0; max-height:38%;
+  background:rgba(5,12,28,0.94); backdrop-filter:blur(8px);
+  border-top:2px solid #1565c0; color:#e3f2fd;
+  transform:translateY(100%); transition:transform 0.3s ease;
+  z-index:200; overflow-y:auto; padding:16px 28px; }
+#notes-panel.open { transform:translateY(0); }
+#notes-panel h4 { font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:#90caf9; margin-bottom:10px; }
+#notes-panel p,#notes-panel li { font-size:13px; line-height:1.5; color:#cfd8dc; }
+#notes-panel ul { gap:4px; }
+#notes-panel ul li::before { color:#90caf9; }
+#notes-hint { position:fixed; bottom:20px; left:18px; color:rgba(255,255,255,0.3);
+  font-size:11px; font-family:monospace; z-index:100; }
+</style>
+</head>
+<body>
+<div id="deck"><div id="scroll-inner"><div id="scaler">
+
+<!-- ══ SLIDE 1 — TITLE ══ -->
+<div class="slide title-slide active">
+  <div class="slide-tag">Uber Engineering · Round 3 · System Design</div>
+  <h1>TROAS: Smart Bidding<br>at Scale</h1>
+  <p class="subtitle">Sponsored Products Ad Platform — Deep Dive</p>
+  <p class="byline">Harish G &nbsp;·&nbsp; April 2026</p>
+  <div style="margin-top:36px;display:flex;gap:28px;">
+    <div class="stat"><div class="num">&lt;50ms</div><div class="lbl">Ad serving p99</div></div>
+    <div class="stat"><div class="num">10M+</div><div class="lbl">Active campaigns</div></div>
+    <div class="stat"><div class="num">1B</div><div class="lbl">Ad requests/day</div></div>
+    <div class="stat"><div class="num">17</div><div class="lbl">Services</div></div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 2 — AGENDA ══ -->
+<div class="slide">
+  <h2>Agenda — 75 min</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="card"><h3>Platform Context <span class="tag grey">15 min</span></h3>
+        <ul><li>4-plane architecture overview</li><li>Ad serving critical path</li><li>Where TROAS fits in</li></ul>
+      </div>
+      <div class="card green"><h3>TROAS Deep Dive <span class="tag green">45 min</span></h3>
+        <ul>
+          <li>Why TROAS — the advertiser problem</li>
+          <li>Campaign phase state machine</li>
+          <li>Ingestion: CampaignSvc → Kafka → index</li>
+          <li>Bidding Engine 3-cache architecture</li>
+          <li>Bid strategy per phase</li>
+          <li>ML pipeline (offline + online)</li>
+          <li>Budget pacing + splitter</li>
+          <li>Experiment strategy + safety guards</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card purple"><h3>Trade-offs &amp; Open Problems <span class="tag purple">10 min</span></h3>
+        <ul><li>Cold-start convergence</li><li>Bidding DB scalability redesign</li><li>Observability gaps</li><li>Multi-signal ML model</li></ul>
+      </div>
+      <div class="card orange"><h3>Q&amp;A <span class="tag red">5 min buffer</span></h3></div>
+      <div class="card" style="font-size:13px;padding:10px 14px;">
+        <span class="bold">Press N</span> to toggle speaker notes &nbsp;·&nbsp; ← → to navigate
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 3 — PLATFORM ARCHITECTURE ══ -->
+<div class="slide">
+  <div class="section-bar">Platform Context</div>
+  <h2>4-Plane Platform Architecture</h2>
+  <img src="./diagrams/v2-d1.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 4 — AD SERVING CRITICAL PATH ══ -->
+<div class="slide">
+  <div class="section-bar">Platform Context</div>
+  <h2>Ad Serving Critical Path — &lt;50ms p99</h2>
+  <div class="cols img65l flex1" style="gap:16px;">
+    <div class="col" style="min-height:0;"><img src="./diagrams/v2-d3.svg" style="width:100%;height:100%;object-fit:contain;border-radius:8px;"></div>
+    <div class="col supp">
+      <div class="card"><h3>Gateway (AdGateway)</h3>
+        <ul><li>Apollo Federation GraphQL</li><li>3-level cache: Caffeine → Memcached → Cassandra</li><li>Routes by tenant: WMT / SAMS / INTL</li></ul>
+      </div>
+      <div class="card green"><h3>Auction (AuctionEngine)</h3>
+        <ul><li>True Second Price auction</li><li>Incentive-compatible — advertisers bid true value</li><li>eCPM = pCTR × bid × relevance</li></ul>
+      </div>
+      <div class="formula" style="font-size:11px;">
+        <span class="cmt">// Winner charged second price</span><br>
+        <span class="fn">charge</span> <span class="op">=</span> <span class="var">secondBid</span> <span class="op">+</span> $0.01
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 5 — SECTION BREAK ══ -->
+<div class="slide section-break">
+  <div style="font-size:56px;margin-bottom:12px;">🎯</div>
+  <h2>TROAS Deep Dive</h2>
+  <p style="font-size:18px;color:var(--muted);max-width:520px;margin-top:8px;">
+    Target Return on Ad Spend — automatic bid adjustment to hit an advertiser-configured revenue target
+  </p>
+</div>
+
+<!-- ══ SLIDE 6 — WHY TROAS ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS</div>
+  <h2>The Problem TROAS Solves</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="card orange"><h3>Without TROAS — Manual Bidding</h3>
+        <ul>
+          <li>Advertiser sets a static CPC bid per keyword</li>
+          <li>10M+ ads × thousands of keywords = impossible to tune</li>
+          <li>Static bids ignore time-of-day, competition, seasonality</li>
+          <li>Either overspends (poor ROAS) or misses impressions</li>
+          <li>Requires constant manual monitoring and adjustment</li>
+        </ul>
+      </div>
+      <div class="card" style="margin-top:0;">
+        <h3>The Scale Problem</h3>
+        <p style="font-size:13px;">A human cannot compute the right bid for 10M campaigns at 12,000 auctions/second. Even rule-based systems can't adapt to real-time demand signals.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card green"><h3>With TROAS — Auto Bidding</h3>
+        <ul>
+          <li>Advertiser sets one number: <strong>targetRoas = 4.0</strong></li>
+          <li>System computes the right bid per auction in real-time</li>
+          <li>Maximizes spend while respecting the ROAS constraint</li>
+          <li>Adapts using offline ML models + live budget signals</li>
+          <li>Learns campaign performance over time (phases)</li>
+        </ul>
+      </div>
+      <div class="card purple"><h3>TROAS Constraint</h3>
+        <p style="font-size:13px;"><strong>targetRoas = 4.0</strong> means: for every $1 spent on ads, generate $4 in product revenue. The system maximises impressions subject to this constraint.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 7 — PHASE STATE MACHINE ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Campaign Lifecycle</div>
+  <h2>Campaign Phase State Machine</h2>
+  <img src="./diagrams/v2-d2.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 8 — INGESTION PIPELINE ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Ingestion</div>
+  <h2>Campaign Ingestion — CampaignSvc → Kafka → Index</h2>
+  <div class="cols img65l flex1" style="gap:16px;">
+    <div class="col" style="min-height:0;">
+      <img src="./diagrams/v2-d3.svg" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">
+    </div>
+    <div class="col supp">
+      <div class="card"><h3>CampaignSvc — Campaign CRUD</h3>
+        <ul><li>Validates targetRoas ≥ minTargetRoas</li><li>Persists to Azure SQL</li><li>Publishes to Kafka <span class="mono">campaign-events</span></li></ul>
+      </div>
+      <div class="card green"><h3>IndexPublisher — Indexing</h3>
+        <ul><li>Kafka consumer → enriches via ItemRegistry</li><li>Writes to Solr/Vespa (candidate index)</li><li>Writes to Cassandra (eligibility + bid params)</li><li>Multi-tenant fanout: WMT / SAMS / INTL</li></ul>
+      </div>
+      <div class="card orange"><h3>Consistency Model</h3>
+        <p style="font-size:12px;">Async + eventually consistent. Lag between campaign edit and new bid appearing in serving. Protobuf-encoded TROAS fields travel through the pipeline.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 9 — BIDDING ENGINE CACHES ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Bidding Engine</div>
+  <h2>Bidding Engine — 3-Cache Architecture</h2>
+  <img src="./diagrams/v2-d4.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 10 — BID STRATEGY PER PHASE ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Bid Computation</div>
+  <h2>Bid Strategy Per Phase — Decision Tree</h2>
+  <img src="./diagrams/v2-d5.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 11 — CACHE DETAIL: BIDDING ENGINE ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Bidding Engine</div>
+  <h2>Bidding Engine Cache — Key Design Decisions</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="card"><h3>Why 3 Separate Caches?</h3>
+        <ul>
+          <li>Different refresh rates: ad-group params change less often than item-level bid params</li>
+          <li>Day-part factors rotate every 24h on a fixed schedule</li>
+          <li>Allows per-source-type ConfigSvc version validation</li>
+        </ul>
+      </div>
+      <div class="card green"><h3>Zero-Key Fallback Hierarchy</h3>
+        <p style="font-size:13px;margin-bottom:8px;">For item bid params:</p>
+        <div style="font-family:monospace;font-size:12px;line-height:2;padding:6px 0;">
+          1. <strong>(adGroupId, itemId)</strong> — item override<br>
+          2. <strong>(adGroupId, '0')</strong> — group default<br>
+          3. <strong>('0', '0')</strong> — system default<br>
+          4. <strong>ConfigSvc defaults</strong> — hard-coded fallback
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card purple"><h3>ConfigSvc Version Validation</h3>
+        <ul>
+          <li>Every cache entry carries a <span class="mono">version</span> field</li>
+          <li>ConfigSvc controls "active" version per source type</li>
+          <li>Mismatch → <span class="mono">VERSION_NOT_IN_CACHE</span> + ConfigSvc default used</li>
+          <li>Zero-downtime rollout: stage DB → flip ConfigSvc key → instant activation</li>
+          <li>Per-source-type granularity: only affected params switch</li>
+        </ul>
+      </div>
+      <div class="card orange"><h3>Zero-Key Fallback — Scale Decision</h3>
+        <ul>
+          <li>Most items in an ad group share identical bid params</li>
+          <li>Write one group default at <span class="mono">(adGroupId, '0')</span> — not per item</li>
+          <li>Only items needing a per-item override get their own row</li>
+          <li>item_bid_params stays at O(campaigns + overrides), not O(campaigns × items)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 12 — ML COMPONENTS ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · ML Platform</div>
+  <h2>ML Pipeline — Offline Training + Online Inference</h2>
+  <img src="./diagrams/v2-d6.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 13 — ML DETAIL ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · ML Platform</div>
+  <h2>ML Scoring Architecture — Key Decisions</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="card"><h3>Two-Tower Retrieval</h3>
+        <ul>
+          <li><strong>Ad Tower</strong>: offline at ad creation → 128-dim embedding stored in VectorDB/Vespa</li>
+          <li><strong>User Tower</strong>: online at serving → Triton inference → ANN top-100 candidates</li>
+          <li>Decouples index build from serving; scales to 10M ads without per-request indexing</li>
+        </ul>
+      </div>
+      <div class="card green"><h3>DCN v2 Ranking</h3>
+        <ul>
+          <li>Ranks top-100 candidates from retrieval</li>
+          <li>Cross network (feature interactions) + Deep network (non-linear)</li>
+          <li>Outputs pCTR, pCVR scores used in bid computation</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card purple"><h3>4-Level Inference Cache</h3>
+        <ul>
+          <li><strong>L1</strong>: Caffeine (in-process) — sub-microsecond</li>
+          <li><strong>L2</strong>: ClusterCache (cluster) — ~1ms</li>
+          <li><strong>L3</strong>: Cassandra (persistent) — ~5ms</li>
+          <li><strong>L4</strong>: Triton H100 (live inference) — ~10ms</li>
+          <li>Cache hit rate on L1/L2 determines if H100s are needed</li>
+        </ul>
+      </div>
+      <div class="card orange"><h3>Feast Feature Store</h3>
+        <ul>
+          <li>5 FeatureViews: item_features, cnsldv2, items_rate, pvpc, item_quality</li>
+          <li>Offline: PySpark on Dataproc → BigQuery → Cassandra (daily)</li>
+          <li>Online: Feast SDK → Cassandra ads keyspace → &lt;10ms</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 14 — BUDGET PACING ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Budget</div>
+  <h2>Budget Pacing + Splitter Architecture</h2>
+  <img src="./diagrams/v2-d7.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 15 — BUDGET DETAIL ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Budget</div>
+  <h2>Budget Pacing — Key Design Decisions</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="card"><h3>BudgetSvc Architecture</h3>
+        <ul>
+          <li>Azure SQL: durable daily budget state — authoritative spend ledger</li>
+          <li>Daily rollover at midnight per tenant timezone (WMT, SAMS, INTL separate cycles)</li>
+          <li>Budget status written to Cassandra → IndexPublisher → Solr index updated</li>
+          <li>Over-budget: campaign removed from index. In-budget: eligible for auction</li>
+        </ul>
+      </div>
+      <div class="card orange"><h3>Click → Budget Deduction Flow</h3>
+        <div class="flow" style="flex-wrap:wrap;gap:6px;margin-top:8px;">
+          <div class="flow-box">Shopper clicks</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">ClickTracker dedup<br><span style="font-weight:400;font-size:10px">900s TTL window</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">BudgetSvc<br><span style="font-weight:400;font-size:10px">Azure SQL deduct</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">Kafka click-events<br><span style="font-weight:400;font-size:10px">async reporting</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card green"><h3>Budget Splitter — A/B Attribution</h3>
+        <ul>
+          <li>Campaign index carries <span class="mono">budgetBucketId</span> per candidate</li>
+          <li>AdOrchestrator resolves bucket from ExperimentPlatform experiment config</li>
+          <li>Click beacon: <span class="mono">bkt = "sp_wmt_srp|bb_BUCKET_A"</span></li>
+          <li>Enables per-bucket spend attribution without extra lookups</li>
+          <li><span class="mono">TROAS_SCORING_CALL{bbid, plmtck, modelId}</span> — dimensional metric</li>
+        </ul>
+      </div>
+      <div class="card purple"><h3>Budget Eligibility Propagation</h3>
+        <p style="font-size:13px;">Over-budget campaigns are removed from the Solr/Vespa index via: BudgetSvc writes to Cassandra → IndexPublisher reads → index updated. Eventually consistent with ~minutes lag.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 16 — EXPERIMENT STRATEGY ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Experiment</div>
+  <h2>TROAS Experiment Strategy — A/B Lifecycle</h2>
+  <img src="./diagrams/v2-d8.svg" style="flex:1;min-height:0;width:100%;object-fit:contain;border-radius:8px;">
+</div>
+
+<!-- ══ SLIDE 17 — SAFETY GUARDS ══ -->
+<div class="slide">
+  <div class="section-bar">TROAS · Resilience</div>
+  <h2>Safety Guards &amp; Edge Cases</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="card" style="padding:10px 14px;">
+        <h3 style="margin-bottom:8px;">Operational Guards</h3>
+        <div class="guard-row"><span class="guard-code">NO_BP</span> <span>bidPrime missing → ConfigSvc default → skip item if still absent</span></div>
+        <div class="guard-row"><span class="guard-code">ZERO_TR</span> <span>targetRoas=0 guard before ML formula</span></div>
+        <div class="guard-row"><span class="guard-code">NO_ML_PARAMS</span> <span>ML params unavailable → ROAS-only fallback</span></div>
+        <div class="guard-row"><span class="guard-code">NO_EXPLORE_CONFIG</span> <span>Exploration distributions missing → ConfigSvc default distributions</span></div>
+        <div class="guard-row"><span class="guard-code">NO_PF</span> <span>pacingFactor absent → default 1.0 (no pacing reduction)</span></div>
+        <div class="guard-row"><span class="guard-code">INVALID_WEIGHTS</span> <span>Bid weights absent/invalid → ROAS-only path</span></div>
+        <div class="guard-row"><span class="guard-code">UNKNOWN_PHASE</span> <span>Unrecognised phase → INIT (safe conservative fallback)</span></div>
+        <div class="guard-row"><span class="guard-code">BELOW_FLOOR</span> <span>Bid below $0.20 floor → clamp + metric emitted</span></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card orange" style="padding:10px 14px;">
+        <h3 style="margin-bottom:8px;">Async / Timeout Guards</h3>
+        <div class="guard-row"><span class="guard-code">TIMEOUT</span> <span>processTroasRequest async timeout → item excluded from response</span></div>
+        <div class="guard-row"><span class="guard-code">VERSION_MISMATCH</span> <span>All source types stale → all ConfigSvc defaults; bid still proceeds</span></div>
+        <div class="guard-row"><span class="guard-code">CACHE_MISS</span> <span>New campaign: cache not yet seeded → zero-key fallback → ConfigSvc</span></div>
+      </div>
+      <div class="card green" style="margin-top:0;padding:10px 14px;">
+        <h3 style="margin-bottom:8px;">Protobuf Contract Guards</h3>
+        <div class="guard-row"><span class="guard-code">DESER_FAIL</span> <span>bidParamsNode JSON parse fail → partially populated params → individual ConfigSvc fallbacks</span></div>
+        <div class="guard-row"><span class="guard-code">NO_TROAS_NODE</span> <span>AuctionEngine receives no TROAS params → standard CPC bidding for that candidate</span></div>
+      </div>
+      <div class="card" style="padding:10px 14px;font-size:12px;">
+        <strong>Key principle:</strong> Never let a missing parameter crash an auction. Every parameter has a fallback, every fallback has a metric, every metric has an alert.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 18 — TRADE-OFFS ══ -->
+<div class="slide">
+  <div class="section-bar">Trade-offs</div>
+  <h2>Key Design Decisions + Open Problems</h2>
+  <div style="flex:1;overflow:auto;">
+    <table>
+      <tr><th>Decision</th><th>Chosen Approach</th><th>Alternative</th><th>Reason</th></tr>
+      <tr><td><strong>Auction type</strong></td><td>True Second Price (TSP)</td><td>First Price</td><td>Incentive-compatible; advertisers bid true value; stable equilibrium</td></tr>
+      <tr><td><strong>Bidding engine</strong></td><td>Sharded gRPC (BiddingEngine)</td><td>Monolith</td><td>Hot campaigns don't starve others; per-shard scaling</td></tr>
+      <tr><td><strong>Feature store</strong></td><td>Feast + Cassandra</td><td>Redis</td><td>Cassandra TTL + compaction fits feature lifecycle; cheaper at scale</td></tr>
+      <tr><td><strong>Ad index</strong></td><td>Solr + Vespa</td><td>Elasticsearch</td><td>Vespa native vector ANN + BM25 hybrid in one system</td></tr>
+      <tr><td><strong>Bid param cache</strong></td><td>3-tier Caffeine (JVM)</td><td>Memcached / Redis</td><td>In-process; zero serialization cost; TTL-based pre-load</td></tr>
+      <tr><td><strong>Item params scale</strong></td><td>Zero-key fallback (group defaults)</td><td>Per-item rows</td><td>O(campaigns + overrides) vs O(campaigns × items); startup pre-load stays fast</td></tr>
+    </table>
+    <div class="cols c2" style="margin-top:14px;gap:14px;display:grid;">
+      <div class="card orange"><h3>Open Problems</h3>
+        <ul style="font-size:13px;">
+          <li>Cold-start convergence — new campaigns wait for bidPrime to be available; exploration phase can overbid</li>
+          <li>OpenTelemetry traces don't span Kafka async boundaries — end-to-end latency invisible</li>
+        </ul>
+      </div>
+      <div class="card green"><h3>What I'd Change</h3>
+        <ul style="font-size:13px;">
+          <li>Complete Solr → Vespa migration: CandidateSvc still spans both; Vespa native ANN is faster</li>
+          <li>Bidding Engine source of truth → Cassandra for horizontal scale (MySQL bottleneck at extreme load)</li>
+          <li>Multi-signal exploration: incorporate post-click engagement signals for faster phase convergence</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 19 — Q&A ══ -->
+<div class="slide dark-slide">
+  <div class="section-bar">Summary</div>
+  <h2>Summary — TROAS in One Flow</h2>
+  <div class="cols c2 flex1">
+    <div class="col">
+      <div class="formula" style="font-size:12px;line-height:2;">
+<span class="cmt">// Ingestion (async)</span><br>
+<span class="fn">Advertiser</span> → CampaignSvc → Kafka → IndexPublisher → Solr/Vespa<br><br>
+<span class="cmt">// Serving (sync, &lt;50ms)</span><br>
+<span class="fn">Shopper</span> → AdGateway → AdOrchestrator → BiddingEngine<br>
+  BiddingEngine <span class="op">loads</span> 3 Caffeine caches <span class="cmt">// phase + params</span><br>
+  BiddingEngine → AuctionEngine (bidParamsNode JSON)<br><br>
+<span class="cmt">// Bid per phase (AuctionEngine)</span><br>
+<span class="var">INIT/TRANS</span>: base bid × time × pacing<br>
+<span class="var">LEARNING</span>:   explore bid space (Bayesian)<br>
+<span class="var">PAUSED</span>:     no bid emitted<br>
+<span class="var">OPT</span>:        ML bid ← Triton pCTR/pCVR<br><br>
+<span class="fn">finalCPC</span> = clamp(bid, $0.20, $5.00) → round(4dp)<br>
+TSP auction → Top-N ads → Shopper
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" style="background:rgba(255,255,255,0.08);border-color:#90caf9;">
+        <h3 style="color:#90caf9;">Key Properties</h3>
+        <ul>
+          <li>Advertiser sets one number: <strong>targetRoas</strong></li>
+          <li>5-phase lifecycle: exploration → ML-driven bidding</li>
+          <li>3-cache bidding engine: in-process, zero-serialization</li>
+          <li>4-level ML cache: H100s only for cache misses</li>
+          <li>Every parameter has a ConfigSvc fallback + metric</li>
+        </ul>
+      </div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:26px;font-weight:800;color:#90caf9;">&lt;50ms</div>
+          <div style="font-size:11px;color:#78909c;margin-top:3px;">End-to-end serving p99</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:26px;font-weight:800;color:#90caf9;">5</div>
+          <div style="font-size:11px;color:#78909c;margin-top:3px;">Campaign phases</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:26px;font-weight:800;color:#90caf9;">3</div>
+          <div style="font-size:11px;color:#78909c;margin-top:3px;">Caffeine caches in Bidding Engine</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:26px;font-weight:800;color:#90caf9;">4</div>
+          <div style="font-size:11px;color:#78909c;margin-top:3px;">ML inference cache levels</div>
+        </div>
+      </div>
+      <p style="margin-top:16px;font-size:16px;color:#90caf9;text-align:center;font-weight:600;">Questions?</p>
+    </div>
+  </div>
+</div>
+
+</div></div></div><!-- end scaler/scroll-inner/deck -->
+
+<div id="progress"></div>
+<div id="slide-num"></div>
+<div id="notes-hint">N = notes &nbsp;·&nbsp; +/− = zoom &nbsp;·&nbsp; 0 = reset zoom &nbsp;·&nbsp; Ctrl+Scroll = zoom</div>
+
+<div id="controls">
+  <button onclick="adjustZoom(-0.1)" title="Zoom out">−</button>
+  <button onclick="resetZoom()" title="Reset zoom" style="font-size:10px;padding:0 6px;">100%</button>
+  <button onclick="adjustZoom(0.1)" title="Zoom in">+</button>
+  <button onclick="goTo(cur-1)" title="Previous">←</button>
+  <button onclick="goTo(cur+1)" title="Next">→</button>
+</div>
+
+<div id="notes-panel">
+  <h4 id="notes-title">Speaker Notes</h4>
+  <div id="notes-body"></div>
+</div>
+
+<script>
+const NOTES = [
+  /* 1 Title */
+  `<ul>
+    <li>Introduce yourself: working on sponsored products ad systems, deep interest in ML-driven bidding</li>
+    <li>Platform overview first (15 min), then TROAS deep dive (45 min), then trade-offs + Q&amp;A</li>
+    <li>Stats: &lt;50ms p99 serves 1B requests/day across 10M campaigns; 17 services in the platform</li>
+  </ul>`,
+  /* 2 Agenda */
+  `<ul>
+    <li>Walk through agenda briefly — don't spend time on this slide</li>
+    <li>Signal to interviewer: happy to go deeper on any component, especially the ML or bidding parts</li>
+    <li>Mention N key for notes toggle if doing this with someone watching your screen</li>
+  </ul>`,
+  /* 3 Platform Architecture */
+  `<ul>
+    <li>4 planes: Tooling (CampaignSvc + ExperimentMgr + BudgetSvc), Indexing (IndexPublisher + Solr/Cassandra), Serving (AdGateway→AdOrchestrator→BiddingEngine→AuctionEngine), ML (MLPlatform + Feast + Triton)</li>
+    <li>Kafka is the event bus connecting tooling to indexing; campaign mutations flow through it</li>
+    <li>Cross-plane: Solr/Cassandra feed candidates/eligibility to serving; Serving calls ML for scoring</li>
+    <li>Multi-tenant: WMT / SAMS / INTL have separate indexes; IndexPublisher fanouts to all</li>
+  </ul>`,
+  /* 4 Ad Serving Critical Path */
+  `<ul>
+    <li>Key insight: parallel fan-out is what gets us under 50ms</li>
+    <li>AdGateway (Apollo Federation GraphQL Gateway) has 3-level cache: Caffeine in-process → Memcached cluster → Cassandra</li>
+    <li>AdOrchestrator orchestrates; calls BiddingEngine for bids and AuctionEngine for auction in parallel</li>
+    <li>TSP = True Second Price: winner pays second-highest bid + $0.01. Incentive-compatible — prevents underbidding</li>
+    <li>eCPM = pCTR × bid × relevance; relevance score from RelevanceScorer/MLPlatform</li>
+  </ul>`,
+  /* 5 Section Break */
+  `<ul><li>Take a breath, reframe — now going deep on TROAS specifically</li></ul>`,
+  /* 6 Why TROAS */
+  `<ul>
+    <li>Core insight: at 10M campaigns × thousands of keywords, manual bidding is impossible even with good tooling</li>
+    <li>targetRoas = 4.0 means $4 revenue per $1 ad spend. Advertiser sets this once; system does the rest</li>
+    <li>TROAS maximizes impressions (spend) subject to a hard ROAS constraint — it's a constrained optimization</li>
+    <li>Differentiate from simple auto-bidding: TROAS has a per-campaign target, not a platform-wide target</li>
+  </ul>`,
+  /* 7 Phase State Machine */
+  `<ul>
+    <li>5 phases: INITIALIZATION → LEARNING (with LEARNING_PAUSED branch) → OPTIMIZATION → TRANSITION</li>
+    <li>Phase is stored in adgroup_bid_params table, propagated to Bidding Engine caches</li>
+    <li>Key transition: LEARNING → OPTIMIZATION happens when sufficient conversion data exists (both pCTR and pCVR models trained)</li>
+    <li>LEARNING_PAUSED: budget depleted or manual pause — no bid emitted, item excluded from auction entirely</li>
+    <li>TRANSITION: experiment applied or strategy switch — ROAS wind-down, same formula as INIT</li>
+    <li>All phases (except PAUSED) → universal clamp to [$0.20, $5.00] range</li>
+  </ul>`,
+  /* 8 Ingestion Pipeline */
+  `<ul>
+    <li>Campaign edit in CampaignSvc UI → validation → Azure SQL persist → Kafka campaign-events</li>
+    <li>IndexPublisher is the Kafka consumer — it enriches via ItemRegistry (item registry), fans out to 3 tenant indexes</li>
+    <li>Writes to Solr/Vespa: campaign candidates with biddingStrategy=TROAS + targetRoas + phase</li>
+    <li>Writes to Cassandra: eligibility flags + bid params pre-loaded into Bidding Engine caches</li>
+    <li>TROAS fields travel as protobuf: AdItemCampaignBidParam.target_roas + bidding_strategy + troas_phase</li>
+    <li>Consistency caveat: if you change targetRoas, it takes a few minutes to propagate to live serving</li>
+  </ul>`,
+  /* 9 Bidding Engine Caches */
+  `<ul>
+    <li>3 Caffeine caches in BiddingEngine, pre-loaded at startup from Azure SQL bid_params tables</li>
+    <li>AdGroup cache: phase, bid weights (ROAS vs ML blend), monetization ratio, campaign status</li>
+    <li>Item cache: bidPrime (base bid), bidBounds ($0.20-$5.00), pacing factor, exploration distributions</li>
+    <li>Zero-key fallback: item → group → system default → ConfigSvc. Critical for cold-start items</li>
+    <li>ConfigSvc version validation: cache entry version vs ConfigSvc-required version; mismatch = VERSION_NOT_IN_CACHE + fallback</li>
+    <li>Zero-key fallback: group default at (adGroupId, '0') serves most items — only overrides need item-level rows. Keeps table at O(campaigns + overrides)</li>
+  </ul>`,
+  /* 10 Bid Strategy */
+  `<ul>
+    <li>Walk through each branch of the tree</li>
+    <li>INIT/TRANS: simple formula — bidPrime (from previous optimization cycle) × time-of-day factor × budget pacing rate</li>
+    <li>LEARNING: Bayesian bandit exploration over bid price buckets (Beta distributions). If bidPrime already available and ConfigSvc flag set, use ROAS-based instead (optimization algo for learning phase)</li>
+    <li>PAUSED: no bid, item excluded entirely</li>
+    <li>OPTIMIZATION: full-score items get ML-driven bid (Triton pCTR + pCVR). Non-full-score (cold-start, missing features) fall back to ROAS formula</li>
+    <li>All paths → calculateTroasCPC: clamp to [floor, ceiling], round to 4 decimal places</li>
+  </ul>`,
+  /* 11 Cache Detail */
+  `<ul>
+    <li>3 caches for 3 refresh rates: adgroup params change infrequently, item params change with bid cycles, day-part rotates daily</li>
+    <li>ConfigSvc = Centralized Config Management. Acts as a feature flag and config store. Keys under troas.default.* namespace</li>
+    <li>Zero-downtime rollout: write new bid params with version="v2", then flip ConfigSvc key from "v1" to "v2". No deploy needed</li>
+    <li>Zero-key fallback design: group defaults at (adGroupId, '0') — most items share identical params, only overrides get their own row</li>
+  </ul>`,
+  /* 12 ML Components */
+  `<ul>
+    <li>Two paths: offline daily batch (BigQuery → PySpark → Feast → Cassandra + model training) and online per-request (&lt;5ms)</li>
+    <li>Offline: FeaturePipeline pipeline materializes 5 FeatureViews from BigQuery to Cassandra daily</li>
+    <li>Online: FeatureServer Java service serves features at &lt;10ms. 4-level cache stack; Triton only hit on cache miss</li>
+    <li>Triton H100 cluster: 16 replicas across 3 Azure regions (SCUS, WUSE2, EUS2). Handles pCTR, pCVR, pVPC, embedding ANN</li>
+    <li>4-level cache design: cache hit on L1 (Caffeine) avoids all downstream calls. H100s are expensive — cache aggressively</li>
+  </ul>`,
+  /* 13 ML Detail */
+  `<ul>
+    <li>Two-Tower: Ad tower offline (at ad creation) → 128-dim embedding stored. User tower online at serving time → ANN against stored ad embeddings → top-100 candidates</li>
+    <li>DCN v2: Cross Network captures explicit feature interactions + Deep Network for implicit. Output: pCTR and pCVR per candidate</li>
+    <li>These scores feed into bid computation in OPTIMIZATION phase (full-score items only)</li>
+    <li>Feast: 5 FeatureViews: item_features (item metadata), cnsldv2 (consolidated signals), items_rate (historical CTR), pvpc (predicted value per conversion), item_quality</li>
+  </ul>`,
+  /* 14 Budget Pacing */
+  `<ul>
+    <li>Two components: BudgetSvc (budget pacing) and budget splitter (A/B attribution)</li>
+    <li>BudgetSvc: Azure SQL as the authoritative daily budget ledger; eligibility status written to Cassandra for low-latency auction checks</li>
+    <li>Budget splitter: campaign index carries budgetBucketId → flows through AdOrchestrator → BiddingEngine → AuctionEngine → click beacon. No extra DB lookup needed</li>
+    <li>Click beacon format: "sp_wmt_srp|bb_BUCKET_A" — pipe-separated, existing bucket + bucket suffix. Enables per-bucket attribution in reporting</li>
+  </ul>`,
+  /* 15 Budget Detail */
+  `<ul>
+    <li>ClickTracker (click dedup): Cassandra TTL-based 900-second dedup window. Idempotent click processing. Redirect is synchronous; tracking is async</li>
+    <li>Budget deduction: click confirmed → BudgetSvc deducts from Azure SQL → Kafka click-events for reporting</li>
+    <li>Budget eligibility lag: ~minutes between over-budget detection and campaign removal from Solr index. Small window of potential overspend is acceptable vs. the complexity of synchronous enforcement</li>
+  </ul>`,
+  /* 16 Experiment Strategy */
+  `<ul>
+    <li>Key insight: advertisers are skeptical of auto-bidding. The experiment lets them see ROAS improvement with real data before committing</li>
+    <li>CampaignSvc clones the control campaign → test campaign runs TROAS, control runs original bidding → same budget split</li>
+    <li>READY_TO_REVIEW: reports show ROAS delta, revenue delta, impression share. Advertiser sees the lift</li>
+    <li>APPLIED: control campaign migrated to TROAS permanently. Test campaign archived</li>
+    <li>Validation rules: must be LIVE, daily budget, no other active experiments, targetRoas ≥ 0.001, not offsite</li>
+    <li>Safety: LEARNING_PAUSED mid-experiment doesn't end the experiment, just pauses it until budget restored</li>
+  </ul>`,
+  /* 17 Safety Guards */
+  `<ul>
+    <li>Philosophy: never let a missing parameter crash an auction. Degrade gracefully, emit a metric, alert on sustained degradation</li>
+    <li>Every guard emits a counter: NO_BP, ZERO_TR, NO_ML_PARAMS, etc. These counters feed dashboards and PagerDuty alerts</li>
+    <li>UNKNOWN_PHASE guard: unrecognized enum value → INITIALIZATION (conservative, no ML). Better to place a safe bid than skip the ad entirely</li>
+    <li>Async timeout guard: processTroasRequest has configurable timeout. If Bidding Engine caches are pre-loading at startup, items fall back to standard CPC until ready</li>
+    <li>VERSION_MISMATCH is expected behavior during deployments: old cache entries use ConfigSvc defaults until TTL refresh brings new version</li>
+  </ul>`,
+  /* 18 Trade-offs */
+  `<ul>
+    <li>TSP vs First Price: First Price requires shading strategies, leads to bid instability. TSP dominant in programmatic advertising because of incentive compatibility</li>
+    <li>Sharded bidding engine: hot campaign = one campaign getting most of the request load. With monolith, it blocks others. Sharding by campaign ID isolates hot campaigns</li>
+    <li>Cassandra vs Redis for feature store: Cassandra has TTL support (features expire naturally), compaction handles aging data, cheaper per GB. Redis would be faster but more expensive</li>
+    <li>Zero-key fallback design (item params): group defaults serve most items — clean O(campaigns + overrides) scale</li>
+    <li>Open: Solr vs Vespa migration (CandidateSvc) is incomplete — two systems to maintain. Vespa's native ANN + BM25 hybrid would simplify the stack</li>
+    <li>Open: BiddingEngine MySQL bottleneck at extreme scale — BiddingEngine uses MySQL as source of truth for bid params; should move to Cassandra for horizontal scaling</li>
+  </ul>`,
+  /* 19 Q&A */
+  `<ul>
+    <li>Summarize: TROAS is a 5-phase auto-bidding system. Phase determines strategy: exploration → ML-driven. All paths clamp to [$0.20, $5.00]</li>
+    <li>3-cache Bidding Engine: pre-loaded Caffeine caches + ConfigSvc version validation + zero-key fallback</li>
+    <li>4-level ML cache: H100s only hit on cache miss — key to sub-50ms serving</li>
+    <li>Invite questions on any component — most likely areas: ML scoring architecture, cold-start problem, experiment budget attribution</li>
+  </ul>`
+];
+
+let cur = 0;
+const slides = document.querySelectorAll('.slide');
+const total  = slides.length;
+
+function goTo(n) {
+  slides[cur].classList.remove('active');
+  cur = Math.max(0, Math.min(n, total - 1));
+  const s = slides[cur];
+  s.classList.add('active', 'fade-in');
+  s.addEventListener('animationend', () => s.classList.remove('fade-in'), {once:true});
+  document.getElementById('slide-num').textContent = (cur+1) + ' / ' + total;
+  document.getElementById('progress').style.width = ((cur+1)/total*100) + '%';
+  const nt = document.getElementById('notes-title');
+  const nb = document.getElementById('notes-body');
+  nt.textContent = 'Slide ' + (cur+1) + ' — Speaker Notes';
+  nb.innerHTML = NOTES[cur] || '<p>No notes for this slide.</p>';
+  scaleSlides();
+}
+
+let zoomLevel = 1.0;  /* user zoom multiplier */
+
+function scaleSlides() {
+  const scaler = document.getElementById('scaler');
+  const inner  = document.getElementById('scroll-inner');
+  const sw = 1280, sh = 720;
+  const ww = window.innerWidth, wh = window.innerHeight;
+  const base  = Math.min(ww / sw, wh / sh) * 0.96;
+  const scale = base * zoomLevel;
+  const scaledW = sw * scale;
+  const scaledH = sh * scale;
+
+  /* Center the slide when it fits; anchor to top-left when bigger than viewport */
+  const offsetX = Math.max(0, (ww - scaledW) / 2);
+  const offsetY = Math.max(0, (wh - scaledH) / 2);
+
+  /* transform-origin: top left so visual expansion goes right + down from (offsetX, offsetY) */
+  scaler.style.transform       = 'scale(' + scale + ')';
+  scaler.style.transformOrigin = 'top left';
+  scaler.style.left            = offsetX + 'px';
+  scaler.style.top             = offsetY + 'px';
+
+  /* #scroll-inner must cover the full visual extent so #deck scrollbars appear correctly.
+     CSS transform doesn't affect layout, so we set the inner size explicitly. */
+  inner.style.width  = Math.max(ww,  offsetX + scaledW) + 'px';
+  inner.style.height = Math.max(wh,  offsetY + scaledH) + 'px';
+}
+
+function adjustZoom(delta) {
+  zoomLevel = Math.min(3.0, Math.max(0.3, zoomLevel + delta));
+  scaleSlides();
+}
+
+function resetZoom() {
+  zoomLevel = 1.0;
+  scaleSlides();
+}
+
+window.addEventListener('resize', scaleSlides);
+scaleSlides();
+goTo(0);
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); goTo(cur+1); }
+  if (e.key === 'ArrowLeft'  || e.key === 'PageUp')  { e.preventDefault(); goTo(cur-1); }
+  if (e.key === 'n' || e.key === 'N') {
+    document.getElementById('notes-panel').classList.toggle('open');
+  }
+  if (e.key === 'Home') goTo(0);
+  if (e.key === 'End')  goTo(total-1);
+  /* Zoom: +/= to zoom in, - to zoom out, 0 to reset */
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); adjustZoom(0.1); }
+  if (e.key === '-' || e.key === '_') { e.preventDefault(); adjustZoom(-0.1); }
+  if (e.key === '0') { e.preventDefault(); resetZoom(); }
+});
+
+/* Ctrl+Wheel / trackpad pinch to zoom */
+document.addEventListener('wheel', e => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    adjustZoom(e.deltaY < 0 ? 0.05 : -0.05);
+  }
+}, { passive: false });
+
+/* Touch pinch-to-zoom */
+let lastPinchDist = null;
+let pinchStartZoom = 1.0;
+
+function touchDist(e) {
+  const dx = e.touches[0].clientX - e.touches[1].clientX;
+  const dy = e.touches[0].clientY - e.touches[1].clientY;
+  return Math.hypot(dx, dy);
+}
+
+document.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    lastPinchDist = touchDist(e);
+    pinchStartZoom = zoomLevel;
+    e.preventDefault(); /* block browser native zoom */
+  }
+}, { passive: false });
+
+document.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && lastPinchDist !== null) {
+    e.preventDefault(); /* must be non-passive to call this */
+    const dist = touchDist(e);
+    /* scale zoom proportionally to finger spread ratio */
+    zoomLevel = Math.min(3.0, Math.max(0.3, pinchStartZoom * (dist / lastPinchDist)));
+    scaleSlides();
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  if (e.touches.length < 2) lastPinchDist = null;
+}, { passive: true });
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<svg width="1400" height="620" viewBox="0 0 1400 620" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+<defs>
+  <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#6a1b9a"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#2e7d32"/></marker>
+  <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#1565c0"/></marker>
+  <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e65100"/></marker>
+</defs>
+
+<rect width="1400" height="620" fill="#f8fafc"/>
+<text x="700" y="36" font-size="22" font-weight="700" text-anchor="middle" fill="#1a237e">ML Pipeline — Offline Training + Online Inference</text>
+
+<!-- ═══ OFFLINE LANE ═══ -->
+<rect x="20" y="65" width="650" height="510" rx="14" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2.5"/>
+<rect x="20" y="65" width="650" height="40" rx="14" fill="#7b1fa2"/><rect x="20" y="85" width="650" height="20" fill="#7b1fa2"/>
+<text x="345" y="94" font-size="14" font-weight="700" letter-spacing="2" text-anchor="middle" fill="white">OFFLINE — Daily Batch Pipeline</text>
+
+<!-- BigQuery -->
+<rect x="70" y="130" width="230" height="70" rx="10" fill="#6a1b9a"/>
+<text x="185" y="161" font-size="16" font-weight="700" text-anchor="middle" fill="white">BigQuery</text>
+<text x="185" y="181" font-size="11" text-anchor="middle" fill="#e1bee7">Historical click + conversion logs</text>
+
+<!-- PySpark -->
+<rect x="350" y="130" width="230" height="70" rx="10" fill="#7b1fa2"/>
+<text x="465" y="161" font-size="16" font-weight="700" text-anchor="middle" fill="white">PySpark / Dataproc</text>
+<text x="465" y="181" font-size="11" text-anchor="middle" fill="#e1bee7">Feature materialization pipeline</text>
+
+<line x1="300" y1="165" x2="348" y2="165" stroke="#ce93d8" stroke-width="2.5" marker-end="url(#ap)"/>
+
+<!-- Feast offline store -->
+<rect x="70" y="245" width="230" height="70" rx="10" fill="#8e24aa"/>
+<text x="185" y="276" font-size="16" font-weight="700" text-anchor="middle" fill="white">Feast Offline Store</text>
+<text x="185" y="296" font-size="11" text-anchor="middle" fill="#f3e5f5">BigQuery feature snapshots</text>
+
+<path d="M465 200 L465 220 L185 220 L185 243" stroke="#ce93d8" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#ap)" fill="none"/>
+
+<!-- Feature engineering box -->
+<rect x="350" y="245" width="230" height="70" rx="10" fill="#7b1fa2"/>
+<text x="465" y="272" font-size="14" font-weight="700" text-anchor="middle" fill="white">Feature Engineering</text>
+<text x="465" y="291" font-size="11" text-anchor="middle" fill="#e1bee7">item_features · cnsldv2</text>
+<text x="465" y="307" font-size="11" text-anchor="middle" fill="#e1bee7">items_rate · pvpc · item_quality</text>
+
+<path d="M185 315 L465 315 L465 243" stroke="#ce93d8" stroke-width="1.5" stroke-dasharray="4,3" fill="none"/>
+
+<!-- Model Training -->
+<rect x="70" y="360" width="510" height="90" rx="10" fill="#4a148c"/>
+<text x="325" y="395" font-size="17" font-weight="700" text-anchor="middle" fill="white">Model Training</text>
+<text x="325" y="418" font-size="12" text-anchor="middle" fill="#ce93d8">Two-Tower retrieval · DCN v2 ranking · pCTR / pCVR models</text>
+<text x="325" y="438" font-size="11" text-anchor="middle" fill="#e1bee7">GCP Dataproc · daily batch · versioned artifacts</text>
+
+<path d="M185 315 L185 358" stroke="#ce93d8" stroke-width="2" marker-end="url(#ap)" fill="none"/>
+<path d="M465 315 L465 358" stroke="#ce93d8" stroke-width="2" marker-end="url(#ap)" fill="none"/>
+
+<!-- Triton Model Registry -->
+<rect x="150" y="495" width="350" height="60" rx="10" fill="#6a1b9a"/>
+<text x="325" y="523" font-size="15" font-weight="700" text-anchor="middle" fill="white">Triton Model Registry</text>
+<text x="325" y="543" font-size="11" text-anchor="middle" fill="#e1bee7">Versioned model artifacts → deployed to H100 cluster</text>
+<path d="M325 450 L325 493" stroke="#ce93d8" stroke-width="2.5" marker-end="url(#ap)" fill="none"/>
+
+<!-- ═══ ONLINE LANE ═══ -->
+<rect x="730" y="65" width="640" height="510" rx="14" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2.5"/>
+<rect x="730" y="65" width="640" height="40" rx="14" fill="#1b5e20"/><rect x="730" y="85" width="640" height="20" fill="#1b5e20"/>
+<text x="1050" y="94" font-size="14" font-weight="700" letter-spacing="2" text-anchor="middle" fill="white">ONLINE — Per-Request Inference &lt;5ms</text>
+
+<!-- Ad Request -->
+<rect x="780" y="130" width="180" height="60" rx="10" fill="#1b5e20"/>
+<text x="870" y="156" font-size="15" font-weight="700" text-anchor="middle" fill="white">Ad Request</text>
+<text x="870" y="175" font-size="11" text-anchor="middle" fill="#c8e6c9">candidates from AuctionEngine</text>
+
+<!-- Feature Lookup -->
+<rect x="780" y="240" width="180" height="75" rx="10" fill="#2e7d32"/>
+<text x="870" y="270" font-size="15" font-weight="700" text-anchor="middle" fill="white">Feast SDK</text>
+<text x="870" y="290" font-size="11" text-anchor="middle" fill="#c8e6c9">getOnlineFeatures()</text>
+<text x="870" y="308" font-size="11" text-anchor="middle" fill="#c8e6c9">Cassandra ads keyspace</text>
+<path d="M870 190 L870 238" stroke="#81c784" stroke-width="2.5" marker-end="url(#ag)" fill="none"/>
+
+<!-- 4-level cache stack -->
+<rect x="1010" y="130" width="320" height="260" rx="12" fill="#fff3e0" stroke="#e65100" stroke-width="2"/>
+<text x="1170" y="155" font-size="13" font-weight="700" text-anchor="middle" fill="#e65100">4-Level Inference Cache</text>
+<rect x="1030" y="165" width="280" height="40" rx="8" fill="#e65100"/>
+<text x="1170" y="190" font-size="13" font-weight="700" text-anchor="middle" fill="white">L1: Caffeine (in-process)</text>
+<rect x="1030" y="213" width="280" height="40" rx="8" fill="#ef6c00"/>
+<text x="1170" y="238" font-size="13" font-weight="700" text-anchor="middle" fill="white">L2: ClusterCache (cluster)</text>
+<rect x="1030" y="261" width="280" height="40" rx="8" fill="#f57c00"/>
+<text x="1170" y="286" font-size="13" font-weight="700" text-anchor="middle" fill="white">L3: Cassandra (persistent)</text>
+<rect x="1030" y="309" width="280" height="40" rx="8" fill="#bf360c"/>
+<text x="1170" y="334" font-size="13" font-weight="700" text-anchor="middle" fill="white">L4: Triton H100 (live inference)</text>
+<text x="1170" y="365" font-size="11" text-anchor="middle" fill="#546e7a">Hit rate on L1/L2 determines H100 load</text>
+
+<!-- Triton -->
+<rect x="780" y="375" width="540" height="90" rx="12" fill="#4a148c"/>
+<text x="1050" y="415" font-size="20" font-weight="700" text-anchor="middle" fill="white">Triton H100 Inference</text>
+<text x="1050" y="440" font-size="12" text-anchor="middle" fill="#ce93d8">pCTR · pCVR · pVPC · item embedding ANN</text>
+<text x="1050" y="458" font-size="11" text-anchor="middle" fill="#e1bee7">16 replicas · SCUS / WUSE2 / EUS2 · &lt;5ms</text>
+
+<path d="M870 315 L870 373" stroke="#81c784" stroke-width="2.5" marker-end="url(#ag)" fill="none"/>
+<path d="M1170 395 L1170 373" stroke="#e65100" stroke-width="2" marker-end="url(#ao)" fill="none"/>
+
+<!-- Scores back to AuctionEngine -->
+<rect x="870" y="510" width="360" height="52" rx="10" fill="#1b5e20"/>
+<text x="1050" y="536" font-size="14" font-weight="700" text-anchor="middle" fill="white">Scores → AuctionEngine</text>
+<text x="1050" y="553" font-size="11" text-anchor="middle" fill="#c8e6c9">pCTR, pCVR, pVPC per candidate item</text>
+<path d="M1050 465 L1050 508" stroke="#81c784" stroke-width="2.5" marker-end="url(#ag)" fill="none"/>
+
+<!-- Offline → Online bridge (model deployment arrow) -->
+<path d="M670 525 L778 525" stroke="#7b1fa2" stroke-width="2.5" stroke-dasharray="6,3" marker-end="url(#ap)" fill="none"/>
+<text x="724" y="518" font-size="11" text-anchor="middle" fill="#7b1fa2">deploy</text>
+</svg>

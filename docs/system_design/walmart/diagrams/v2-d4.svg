@@ -1,0 +1,128 @@
+<svg width="1400" height="660" viewBox="0 0 1400 660" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+<defs>
+  <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#43a047"/></marker>
+  <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#1565c0"/></marker>
+  <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e65100"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#c62828"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#546e7a"/></marker>
+</defs>
+
+<rect width="1400" height="660" fill="#f8fafc"/>
+<text x="700" y="36" font-size="22" font-weight="700" text-anchor="middle" fill="#1a237e">Bidding Engine — 3-Cache Architecture (BiddingEngine)</text>
+<text x="700" y="60" font-size="13" text-anchor="middle" fill="#546e7a">Pre-loaded at startup · Periodic TTL refresh · ConfigSvc version validation per source type</text>
+
+<!-- ═══ CACHE 1: AdGroup Bid Params ═══ -->
+<rect x="30" y="90" width="390" height="300" rx="14" fill="#e8f0fe" stroke="#1565c0" stroke-width="2.5"/>
+<rect x="30" y="90" width="390" height="40" rx="14" fill="#1565c0"/><rect x="30" y="112" width="390" height="18" fill="#1565c0"/>
+<text x="225" y="119" font-size="14" font-weight="700" letter-spacing="1" text-anchor="middle" fill="white">AdGroup Bid Params Cache</text>
+<text x="225" y="153" font-size="12" font-weight="700" text-anchor="middle" fill="#1565c0">Key: adGroupId</text>
+<!-- fields -->
+<rect x="60" y="165" width="330" height="38" rx="8" fill="white"/>
+<text x="95" y="185" font-size="13" font-weight="700" fill="#1a237e">phase</text>
+<text x="250" y="185" font-size="12" fill="#37474f">Campaign learning phase</text>
+<rect x="60" y="210" width="330" height="38" rx="8" fill="#f5f5f5"/>
+<text x="95" y="230" font-size="13" font-weight="700" fill="#1a237e">bid weights</text>
+<text x="250" y="230" font-size="12" fill="#37474f">ROAS vs ML blend ratio</text>
+<rect x="60" y="255" width="330" height="38" rx="8" fill="white"/>
+<text x="95" y="275" font-size="13" font-weight="700" fill="#1a237e">monetizationRatio</text>
+<text x="250" y="275" font-size="12" fill="#37474f">Revenue calibration</text>
+<rect x="60" y="300" width="330" height="38" rx="8" fill="#f5f5f5"/>
+<text x="95" y="320" font-size="13" font-weight="700" fill="#1a237e">campaignStatus</text>
+<text x="250" y="320" font-size="12" fill="#37474f">LIVE / PAUSED / ENDED</text>
+<text x="225" y="372" font-size="11" text-anchor="middle" fill="#546e7a">Source: adgroup_bid_params (Azure SQL)</text>
+
+<!-- ═══ CACHE 2: Item Bid Params ═══ -->
+<rect x="505" y="90" width="390" height="380" rx="14" fill="#fff3e0" stroke="#e65100" stroke-width="2.5"/>
+<rect x="505" y="90" width="390" height="40" rx="14" fill="#e65100"/><rect x="505" y="112" width="390" height="18" fill="#e65100"/>
+<text x="700" y="119" font-size="14" font-weight="700" letter-spacing="1" text-anchor="middle" fill="white">Item Bid Params Cache</text>
+<text x="700" y="153" font-size="12" font-weight="700" text-anchor="middle" fill="#e65100">Key: (adGroupId, itemId)</text>
+<!-- fields -->
+<rect x="535" y="165" width="330" height="38" rx="8" fill="white"/>
+<text x="570" y="185" font-size="13" font-weight="700" fill="#1a237e">bidPrime</text>
+<text x="720" y="185" font-size="12" fill="#37474f">Base bid from prev cycle</text>
+<rect x="535" y="210" width="330" height="38" rx="8" fill="#fff8f0"/>
+<text x="570" y="230" font-size="13" font-weight="700" fill="#1a237e">bidBounds</text>
+<text x="720" y="230" font-size="12" fill="#37474f">[$0.20 floor, $5.00 ceiling]</text>
+<rect x="535" y="255" width="330" height="38" rx="8" fill="white"/>
+<text x="570" y="275" font-size="13" font-weight="700" fill="#1a237e">pacingFactor</text>
+<text x="720" y="275" font-size="12" fill="#37474f">Budget depletion ratio (0–1)</text>
+<rect x="535" y="300" width="330" height="38" rx="8" fill="#fff8f0"/>
+<text x="570" y="320" font-size="13" font-weight="700" fill="#1a237e">explorationParams</text>
+<text x="720" y="320" font-size="12" fill="#37474f">Bid price distributions</text>
+
+<!-- Fallback hierarchy box -->
+<rect x="535" y="352" width="330" height="90" rx="8" fill="#fbe9e7" stroke="#c62828" stroke-width="1.5"/>
+<text x="700" y="375" font-size="12" font-weight="700" text-anchor="middle" fill="#c62828">Zero-Key Fallback Hierarchy</text>
+<text x="700" y="395" font-size="11" text-anchor="middle" fill="#37474f">1. (adGroupId, itemId)  — item-specific</text>
+<text x="700" y="412" font-size="11" text-anchor="middle" fill="#37474f">2. (adGroupId, '0')  — ad-group default</text>
+<text x="700" y="429" font-size="11" text-anchor="middle" fill="#37474f">3. ('0', '0')  — system-wide default</text>
+<text x="700" y="455" font-size="11" text-anchor="middle" fill="#546e7a">Source: item_bid_params (Azure SQL)</text>
+
+<!-- ═══ CACHE 3: DayPart Bid Params ═══ -->
+<rect x="980" y="90" width="390" height="300" rx="14" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2.5"/>
+<rect x="980" y="90" width="390" height="40" rx="14" fill="#2e7d32"/><rect x="980" y="112" width="390" height="18" fill="#2e7d32"/>
+<text x="1175" y="119" font-size="14" font-weight="700" letter-spacing="1" text-anchor="middle" fill="white">DayPart Bid Params Cache</text>
+<text x="1175" y="153" font-size="12" font-weight="700" text-anchor="middle" fill="#2e7d32">Key: (adGroupId, date)</text>
+<!-- 24h bar chart visual -->
+<text x="1175" y="185" font-size="12" text-anchor="middle" fill="#37474f">24-element time-of-day factor vector</text>
+<!-- Mini bar chart -->
+<rect x="1010" y="195" width="6" height="30" rx="2" fill="#81c784"/>
+<rect x="1022" y="205" width="6" height="20" rx="2" fill="#81c784"/>
+<rect x="1034" y="210" width="6" height="15" rx="2" fill="#a5d6a7"/>
+<rect x="1046" y="215" width="6" height="10" rx="2" fill="#a5d6a7"/>
+<rect x="1058" y="215" width="6" height="10" rx="2" fill="#a5d6a7"/>
+<rect x="1070" y="210" width="6" height="15" rx="2" fill="#81c784"/>
+<rect x="1082" y="200" width="6" height="25" rx="2" fill="#66bb6a"/>
+<rect x="1094" y="195" width="6" height="30" rx="2" fill="#43a047"/>
+<rect x="1106" y="185" width="6" height="40" rx="2" fill="#2e7d32"/>
+<rect x="1118" y="180" width="6" height="45" rx="2" fill="#2e7d32"/>
+<rect x="1130" y="185" width="6" height="40" rx="2" fill="#43a047"/>
+<rect x="1142" y="195" width="6" height="30" rx="2" fill="#66bb6a"/>
+<rect x="1154" y="200" width="6" height="25" rx="2" fill="#81c784"/>
+<rect x="1166" y="205" width="6" height="20" rx="2" fill="#81c784"/>
+<rect x="1178" y="200" width="6" height="25" rx="2" fill="#66bb6a"/>
+<rect x="1190" y="190" width="6" height="35" rx="2" fill="#43a047"/>
+<rect x="1202" y="185" width="6" height="40" rx="2" fill="#2e7d32"/>
+<rect x="1214" y="180" width="6" height="45" rx="2" fill="#1b5e20"/>
+<rect x="1226" y="175" width="6" height="50" rx="2" fill="#1b5e20"/>
+<rect x="1238" y="185" width="6" height="40" rx="2" fill="#2e7d32"/>
+<rect x="1250" y="200" width="6" height="25" rx="2" fill="#66bb6a"/>
+<rect x="1262" y="210" width="6" height="15" rx="2" fill="#81c784"/>
+<rect x="1274" y="215" width="6" height="10" rx="2" fill="#a5d6a7"/>
+<rect x="1286" y="215" width="6" height="10" rx="2" fill="#a5d6a7"/>
+<line x1="1010" y1="227" x2="1296" y2="227" stroke="#78909c" stroke-width="1"/>
+<text x="1025" y="242" font-size="10" fill="#546e7a">0h</text>
+<text x="1150" y="242" font-size="10" text-anchor="middle" fill="#546e7a">12h</text>
+<text x="1280" y="242" font-size="10" fill="#546e7a">23h</text>
+
+<rect x="1010" y="258" width="330" height="55" rx="8" fill="white"/>
+<text x="1175" y="280" font-size="13" font-weight="600" text-anchor="middle" fill="#37474f">→ factor = vector[currentHour]</text>
+<text x="1175" y="300" font-size="12" text-anchor="middle" fill="#546e7a">Must have exactly 24 elements</text>
+<text x="1175" y="375" font-size="11" text-anchor="middle" fill="#546e7a">Source: day_part_bid_params (Azure SQL)</text>
+
+<!-- ═══ BOTTOM: Version Validation + Output ═══ -->
+<rect x="30" y="510" width="1340" height="120" rx="14" fill="#fce4ec" stroke="#c62828" stroke-width="2"/>
+<text x="700" y="537" font-size="15" font-weight="700" text-anchor="middle" fill="#c62828">ConfigSvc Version Validation — applied to all 3 caches before use</text>
+
+<rect x="60" y="550" width="380" height="60" rx="10" fill="white"/>
+<text x="250" y="572" font-size="13" font-weight="700" text-anchor="middle" fill="#c62828">Version MATCH</text>
+<text x="250" y="592" font-size="12" text-anchor="middle" fill="#37474f">Use cache value → bidParamsNode field populated</text>
+
+<rect x="510" y="550" width="380" height="60" rx="10" fill="#fff8e1"/>
+<text x="700" y="572" font-size="13" font-weight="700" text-anchor="middle" fill="#e65100">Version MISMATCH</text>
+<text x="700" y="592" font-size="12" text-anchor="middle" fill="#37474f">VERSION_NOT_IN_CACHE counter + ConfigSvc default used</text>
+
+<rect x="960" y="550" width="380" height="60" rx="10" fill="#e8f5e9"/>
+<text x="1150" y="572" font-size="13" font-weight="700" text-anchor="middle" fill="#1b5e20">Zero-downtime rollout</text>
+<text x="1150" y="592" font-size="12" text-anchor="middle" fill="#37474f">Stage new params → flip ConfigSvc key → instant activation</text>
+
+<!-- Cache → validation arrow -->
+<path d="M225 392 L225 470 L700 470 L700 508" stroke="#c62828" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#ar)" fill="none"/>
+<path d="M700 482 L700 508" stroke="#c62828" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+<path d="M1175 392 L1175 470 L700 470" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,3" fill="none"/>
+
+<!-- bidParamsNode output -->
+<rect x="580" y="430" width="240" height="50" rx="10" fill="#4a148c"/>
+<text x="700" y="457" font-size="14" font-weight="700" text-anchor="middle" fill="white">bidParamsNode JSON → AuctionEngine</text>
+<text x="700" y="474" font-size="11" text-anchor="middle" fill="#e1bee7">phase · weights · bidPrime · bounds · factors</text>
+</svg>
