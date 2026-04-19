@@ -3,269 +3,277 @@ ByteDance · April 21, 2026
 
 ---
 
+## YouTube Study References
+
+### LLM Inference & KV Cache
+- [LLM inference optimization: Architecture, KV cache and Flash Attention](https://www.youtube.com/watch?v=jk2FsJxZFo8) — best single overview video
+- [KV Cache Crash Course](https://www.youtube.com/watch?v=SLYUBsZE72E) — focused deep dive
+- [Efficient LLM Inference — vLLM, KV Cache, Flash Decoding](https://www.youtube.com/watch?v=yVXtLTcdO1Q) — University of Waterloo lecture
+- [How to make LLMs fast: KV Caching, Speculative Decoding](https://www.youtube.com/watch?v=PncVSWbxdWU)
+- [Optimize LLM inference with vLLM](https://www.youtube.com/watch?v=lxjWiVuK5cA)
+
+### Speculative Decoding
+- [Speculative Decoding: 3× Faster LLM Inference with Zero Quality Loss](https://www.youtube.com/watch?v=Qh9cIEelCj4)
+- [Faster LLMs: Accelerate Inference with Speculative Decoding](https://www.youtube.com/watch?v=VkWlLSTdHs8)
+
+### GPU Kernels & Triton ← PRIMARY FOCUS
+- [Triton GPU Kernels 101 — full playlist (start here)](https://www.youtube.com/watch?v=TUQAyCNxFe4) ⭐
+- [Flash Attention derived from first principles with Triton](https://www.youtube.com/watch?v=zy8ChVd_oTM) ⭐
+- [Flash Attention fwd pass — Triton Kernels 101 Lesson 9](https://www.youtube.com/watch?v=6ap2QVWKFH0) ⭐
+- [Flash Attention bwd pass — Triton Kernels 101 Lesson 10](https://www.youtube.com/watch?v=cygYBmB5ow8)
+- [Fused Softmax — Triton Kernels 101 Lesson 5](https://www.youtube.com/watch?v=ftknUZDQCPc)
+- [Practitioners Guide to Triton (Lecture 14)](https://www.youtube.com/watch?v=DdTsX6DQk24)
+- [GPU Programming with Triton Kernels — DevConf.US 2025](https://www.youtube.com/watch?v=sv4soasZK7U)
+- [Torch to Triton LLM Tutorial](https://www.youtube.com/watch?v=ZfjV_GTJLPI)
+- [GPU Memory Coalescing Explained — Warp-Level Optimization](https://www.youtube.com/watch?v=zdzg0m279zA)
+- [Memory Coalescing, Bank Conflicts, Data Staging](https://www.youtube.com/watch?v=4bYLFhMtAqw)
+- [Warp Scheduling and Divergence (Lecture 16)](https://www.youtube.com/watch?v=WClew-fqVkM)
+- [Getting Started with CUDA — NVIDIA GTC 2025](https://www.youtube.com/watch?v=GmNkYayuaA4)
+
+### Quantization
+- [LLM Quantization Explained: GPTQ, AWQ, QLoRA, GGUF and More](https://www.youtube.com/watch?v=WmvZwR4rKJg) — most comprehensive
+- [LLM Fine-Tuning: Quantization Explained Part 1](https://www.youtube.com/watch?v=sLEuVm9ZdxQ) — PTQ, QAT, theory
+- [LLM Fine-Tuning: Quantization Explained Part 2](https://www.youtube.com/watch?v=_3FctggJ9r4) — GPTQ, AWQ, GGUF, llama.cpp
+- [Which Quantization Method is Right for You? GPTQ vs GGUF vs AWQ](https://www.youtube.com/watch?v=mNE_d-C82lI)
+
+### Recommendation Systems
+- [Design TikTok's Recommendation System — ML System Design](https://www.youtube.com/watch?v=Gscelu22FWI) — most relevant to ByteDance
+- [Build TikTok's Personalized Real-Time Recommendation System](https://www.youtube.com/watch?v=skZ1HcF7AsM)
+- [Building Scalable Retrieval with Two-Tower Models](https://www.youtube.com/watch?v=o-pZk5R0TZg)
+- [Using DLRM — Building Recommender Systems with PyTorch](https://www.youtube.com/watch?v=r9J3UZmddC4)
+
+---
+
 ## 1. GPU Memory Hierarchy
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        GPU (A100)                           │
-│                                                             │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
-│  │  SM 0   │  │  SM 1   │  │  SM 2   │  │  SM N   │       │
-│  │         │  │         │  │         │  │   ...   │       │
-│  │ ┌─────┐ │  │ ┌─────┐ │  │ ┌─────┐ │  │ ┌─────┐ │       │
-│  │ │Regs │ │  │ │Regs │ │  │ │Regs │ │  │ │Regs │ │       │
-│  │ │255/t│ │  │ │255/t│ │  │ │255/t│ │  │ │255/t│ │       │
-│  │ │<1 cy│ │  │ │<1 cy│ │  │ │<1 cy│ │  │ │<1 cy│ │       │
-│  │ └─────┘ │  │ └─────┘ │  │ └─────┘ │  │ └─────┘ │       │
-│  │ ┌─────┐ │  │ ┌─────┐ │  │ ┌─────┐ │  │ ┌─────┐ │       │
-│  │ │SRAM │ │  │ │SRAM │ │  │ │SRAM │ │  │ │SRAM │ │       │
-│  │ │164KB│ │  │ │164KB│ │  │ │164KB│ │  │ │164KB│ │       │
-│  │ │4 cy │ │  │ │4 cy │ │  │ │4 cy │ │  │ │4 cy │ │       │
-│  │ └─────┘ │  │ └─────┘ │  │ └─────┘ │  │ └─────┘ │       │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              L2 Cache  (40–80 MB · ~200 cycles)      │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │         HBM  (80 GB · 2 TB/s · ~600 cycles)          │  │
-│  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-
-Rule: minimize HBM round trips → kernel fusion, tiling, Flash Attention
-```
-
----
-
-## 2. Roofline Model
-
-```
-    TFLOPS
-      │
- 312  │                              ╔═══════════════════════
-      │                          ╔══╝  COMPUTE-BOUND
-      │                      ╔══╝     (large matmuls)
-      │                  ╔══╝
-      │              ╔══╝
-      │          ╔══╝ ← Ridge point = 156 FLOPs/byte
-      │      ╔══╝
-      │  ╔══╝  MEMORY-BOUND
-      │══╝    (elementwise, softmax, small batches)
-      └────────────────────────────────────────────── FLOPs/byte
-      0        50       100      156       200
-
-A100: Peak = 312 TFLOPS FP16,  BW = 2 TB/s
-Ridge point = 312e12 / 2000e9 = 156 FLOPs/byte
-
-Operation              Intensity     Bound
-─────────────────────────────────────────
-MatMul (n=4096, FP16)  ~1365         COMPUTE
-LayerNorm              ~2            MEMORY
-Softmax                ~3            MEMORY
-Decode (bs=1)          ~1            MEMORY ← the problem!
-Prefill (seq=2048)     ~600          COMPUTE
-```
-
----
-
-## 3. Transformer Architecture
 
 ```mermaid
 graph TD
-    Input["Input Tokens<br/>[batch, seq, d_model]"]
-    PosEnc["+ Positional Encoding"]
+    R["Registers<br/>255 per thread · &lt;1 cycle · thread-private"]
+    S["Shared Memory / L1 SRAM<br/>164 KB per SM · ~4 cycles · block-shared"]
+    L2["L2 Cache<br/>40–80 MB · ~200 cycles · device-wide"]
+    HBM["HBM — Global Memory<br/>80 GB · 2 TB/s · ~600 cycles"]
+
+    R -->|spill| S
+    S -->|miss| L2
+    L2 -->|miss| HBM
+
+    style R fill:#2d6a4f,color:#fff
+    style S fill:#1e6091,color:#fff
+    style L2 fill:#6b4226,color:#fff
+    style HBM fill:#7b2d8b,color:#fff
+```
+
+> **Rule:** every unnecessary HBM read/write kills performance. Kernel fusion and tiling keep data in SRAM.
+
+---
+
+## 2. Roofline Model — A100
+
+```mermaid
+xychart-beta
+    title "A100 Roofline (FP16)"
+    x-axis "Arithmetic Intensity (FLOPs/byte)" [1, 10, 50, 100, 156, 200, 500, 1000]
+    y-axis "Achievable TFLOPS" 0 --> 350
+    line [2, 20, 100, 200, 312, 312, 312, 312]
+```
+
+| Operation | Intensity | Bound |
+|-----------|-----------|-------|
+| MatMul n=4096 FP16 | ~1365 FLOPs/byte | **Compute** |
+| Prefill seq=2048 | ~600 FLOPs/byte | **Compute** |
+| Softmax | ~3 FLOPs/byte | **Memory** |
+| LayerNorm | ~2 FLOPs/byte | **Memory** |
+| Decode bs=1 | ~1 FLOPs/byte | **Memory** ← the bottleneck |
+
+> Ridge point = 312 TFLOPS ÷ 2 TB/s = **156 FLOPs/byte**
+
+---
+
+## 3. Transformer Layer
+
+```mermaid
+flowchart TD
+    IN["Input\nbatch × seq × d_model"]
     LN1["LayerNorm"]
-    MHA["Multi-Head Attention<br/>h heads, d_k = d_model/h"]
-    Add1["+ Residual"]
+    MHA["Multi-Head Attention\nh heads · d_k = d_model ÷ h\nO of n² · d time"]
+    R1(["＋ Residual"])
     LN2["LayerNorm"]
-    FFN["FFN: Linear → GELU → Linear<br/>d_model → 4·d_model → d_model"]
-    Add2["+ Residual"]
-    Out["Output Logits<br/>[batch, seq, vocab_size]"]
+    FFN["FFN\nLinear → GELU → Linear\nd_model → 4·d_model → d_model"]
+    R2(["＋ Residual"])
+    OUT["Output\nbatch × seq × d_model"]
 
-    Input --> PosEnc --> LN1 --> MHA --> Add1 --> LN2 --> FFN --> Add2 --> Out
-    PosEnc --> Add1
-    Add1 --> Add2
+    IN --> LN1 --> MHA --> R1 --> LN2 --> FFN --> R2 --> OUT
+    IN --> R1
+    R1 --> R2
 ```
 
 ---
 
-## 4. Scaled Dot-Product Attention
+## 4. Scaled Dot-Product Attention Flow
 
-```
-            Q         K         V
-            │         │         │
-      ┌─────▼─────────▼─────────▼─────┐
-      │   (batch, heads, seq, d_k)    │
-      └──────────────────────────────-┘
-                    │
-           Q @ Kᵀ / √d_k
-                    │
-              ┌─────▼─────┐
-              │  Scores   │  (batch, heads, seq_q, seq_k)
-              └─────┬─────┘
-                    │  + causal mask (upper-tri = -∞)
-              ┌─────▼─────┐
-              │  Softmax  │
-              └─────┬─────┘
-                    │ Attention Weights
-              ┌─────▼─────┐
-              │  @ V      │
-              └─────┬─────┘
-                    │
-                 Output  (batch, heads, seq, d_v)
+```mermaid
+flowchart LR
+    Q["Q\nbatch·heads·seq·d_k"]
+    K["K\nbatch·heads·seq·d_k"]
+    V["V\nbatch·heads·seq·d_v"]
 
+    QK["Q @ Kᵀ ÷ √d_k\nScores"]
+    MASK["+ Causal Mask\nupper-tri = −∞"]
+    SM["Softmax\nover key dim"]
+    OUT["@ V\nOutput"]
 
-Complexity:
-  Time:  O(n² · d)   ← quadratic in sequence length!
-  Space: O(n²)       ← attention matrix
-  Flash Attention:   O(n) space, same output, 2-4x faster
+    Q --> QK
+    K --> QK
+    QK --> MASK --> SM --> OUT
+    V --> OUT
 ```
 
 ---
 
-## 5. Causal Mask (Autoregressive)
+## 5. Causal Mask Pattern
 
+```mermaid
+block-beta
+    columns 5
+    space A["pos A"] B["pos B"] C["pos C"] D["pos D"]
+    A1["A"] AA["✓ 1"] AB["✗ 0"] AC["✗ 0"] AD["✗ 0"]
+    B1["B"] BA["✓ 1"] BB["✓ 1"] BC["✗ 0"] BD["✗ 0"]
+    C1["C"] CA["✓ 1"] CB["✓ 1"] CC["✓ 1"] CD["✗ 0"]
+    D1["D"] DA["✓ 1"] DB["✓ 1"] DC["✓ 1"] DD["✓ 1"]
 ```
-Sequence: [A, B, C, D]
 
-Attention matrix (1 = can attend, 0 = masked):
-
-        A    B    C    D
-   A  [ 1    0    0    0 ]   A can only see A
-   B  [ 1    1    0    0 ]   B can see A, B
-   C  [ 1    1    1    0 ]   C can see A, B, C
-   D  [ 1    1    1    1 ]   D can see all
-
-Upper triangle → -∞ before softmax → 0 weight after softmax
-```
+> ✗ positions → score set to −∞ → exp(−∞) = 0 after softmax. Future tokens are invisible.
 
 ---
 
-## 6. KV Cache: Prefill vs Decode
+## 6. KV Cache — Prefill vs Decode
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant GPU
+    participant C as Client
+    participant G as GPU
 
-    Note over Client,GPU: PREFILL PHASE (compute-bound)
-    Client->>GPU: Full prompt [T1, T2, T3, T4, T5]
-    GPU->>GPU: Compute K,V for ALL tokens in parallel
-    GPU->>GPU: Store K,V in cache
-    GPU-->>Client: First output token [T6]
+    Note over C,G: PREFILL — compute-bound, parallel
+    C->>G: Full prompt [T1 T2 T3 T4 T5]
+    G->>G: Compute K,V for ALL tokens simultaneously
+    G->>G: Store K[1..5], V[1..5] in cache
+    G-->>C: First output token T6
 
-    Note over Client,GPU: DECODE PHASE (memory-bound)
-    Client->>GPU: New token T6
-    GPU->>GPU: Compute K,V for T6 only
-    GPU->>GPU: Append to cache: K[1..6], V[1..6]
-    GPU->>GPU: Attend over full cache
-    GPU-->>Client: T7
+    Note over C,G: DECODE — memory-bound, sequential
+    C->>G: Token T6
+    G->>G: Compute K,V for T6 only (1 token!)
+    G->>G: Attend over full cache K[1..6], V[1..6]
+    G-->>C: T7
 
-    Client->>GPU: T7
-    GPU-->>Client: T8
-    Note over GPU: Repeat until EOS or max_len
+    C->>G: Token T7
+    G->>G: Cache grows: K[1..7], V[1..7]
+    G-->>C: T8
+
+    Note over G: Repeat until EOS or max_len
 ```
 
-```
-KV Cache memory per token:
-  = 2 layers × num_layers × num_heads × d_head × bytes
+**Memory cost per token:**
+`2 × num_layers × num_heads × d_head × bytes_per_element`
 
-LLaMA-70B (80L, 64H, 128d, FP16):
-  = 2 × 80 × 64 × 128 × 2 = 2,621,440 bytes ≈ 2.6 MB/token
-
-At 4096 context: 2.6 MB × 4096 = ~10.7 GB (just the cache!)
-```
+| Model | Per Token (FP16) | 4096 ctx total |
+|-------|-----------------|----------------|
+| LLaMA-7B | ~0.25 MB | ~1 GB |
+| LLaMA-70B | ~2.6 MB | ~10.7 GB |
 
 ---
 
-## 7. PagedAttention (vLLM)
+## 7. PagedAttention — Block Manager
 
+```mermaid
+flowchart TD
+    subgraph Physical KV Blocks
+        B0["Block 0\n16 tokens"]
+        B1["Block 1\n16 tokens"]
+        B2["Block 2\n16 tokens"]
+        B3["Block 3\n16 tokens"]
+        B4["Block 4\n16 tokens"]
+        B5["Block 5\n16 tokens"]
+    end
+
+    subgraph Request A ["Request A (48 tokens)"]
+        AT["Block Table: 0→B0, 1→B2, 2→B4"]
+    end
+
+    subgraph Request B ["Request B (32 tokens)"]
+        BT["Block Table: 0→B1, 1→B3"]
+    end
+
+    subgraph Request C ["Request C (16 tokens, same prefix as A)"]
+        CT["Block Table: 0→B0 (shared!), 1→B5"]
+    end
+
+    AT --> B0
+    AT --> B2
+    AT --> B4
+    BT --> B1
+    BT --> B3
+    CT -->|Copy-on-Write| B0
+    CT --> B5
 ```
-PROBLEM — Naive KV Cache:
 
-Request A (max 2048): ████████████████████░░░░░░░░░░░░  (pre-allocated, 50% wasted)
-Request B (max 2048): ████████████░░░░░░░░░░░░░░░░░░░░  (40% wasted)
-Request C (max 2048): ██████████████████████████░░░░░░  (20% wasted)
-
-SOLUTION — PagedAttention (block size = 16 tokens):
-
-Physical KV Blocks:  [ B0 ][ B1 ][ B2 ][ B3 ][ B4 ][ B5 ][ B6 ][ B7 ]
-
-Request A Block Table:  0 → B0,  1 → B3,  2 → B5
-Request B Block Table:  0 → B1,  1 → B4
-Request C Block Table:  0 → B2,  1 → B6,  2 → B7
-
-Benefits:
-  ✓ Allocate blocks on demand — no pre-allocation waste
-  ✓ Free blocks immediately when request ends
-  ✓ Copy-on-Write: share blocks for same prompt prefix
-  ✓ ~23x throughput improvement over static batching
-```
+> Blocks allocated on demand, freed immediately on completion. Near-zero fragmentation.
 
 ---
 
-## 8. Flash Attention — Tiling
+## 8. Flash Attention vs Standard Attention
 
-```
-Standard Attention:                 Flash Attention:
-                                    
-Q ──────────────────────► S        Load Q tile into SRAM
-K ──────────────────────► S        Load K tile into SRAM
-                          │        Compute partial scores (stay in SRAM)
-                  n×n matrix        Update running (max, sum) online
-                  written to HBM    Load V tile, accumulate output
-                          │        Never write n×n to HBM!
-                          ▼        
-V ──────────────────────► O        
+```mermaid
+flowchart LR
+    subgraph Standard ["Standard Attention — O(n²) memory"]
+        direction TB
+        sQ["Q"] --> sS["Q@Kᵀ\nn×n matrix\nwritten to HBM"]
+        sK["K"] --> sS
+        sS --> sSM["Softmax\nread/write HBM again"]
+        sSM --> sO["@V → Output\nread HBM again"]
+        sV["V"] --> sO
+    end
 
-HBM reads:  O(n²·d)         HBM reads:  O(n·d)  (5-20x fewer!)
-Memory:     O(n²)           Memory:     O(n)
+    subgraph Flash ["Flash Attention — O(n) memory"]
+        direction TB
+        fQ["Q tile\n→ SRAM"] --> fC["Compute scores\nstay in SRAM\nonline softmax update"]
+        fK["K tile\n→ SRAM"] --> fC
+        fV["V tile\n→ SRAM"] --> fC
+        fC --> fO["Accumulate output\nwrite once to HBM"]
+    end
 ```
 
+**Online softmax update** (key math — never stores n×n):
 ```
-Online Softmax update (key insight):
-  Given running max m and sum l, new block scores S_new:
-  
-  m_new = max(m_old, max(S_new))
-  l_new = exp(m_old - m_new) · l_old + sum(exp(S_new - m_new))
-  O_new = (exp(m_old - m_new) · l_old · O_old + exp(S_new-m_new) · V) / l_new
-  
-  This is mathematically identical to full softmax — exact, not approximate.
+m_new = max(m_old, max(S_block))
+l_new = exp(m_old − m_new) · l_old + Σ exp(S_block − m_new)
+O_new = (exp(m_old − m_new) · O_old + exp(S_block − m_new) @ V_block) / l_new
 ```
+Result is **mathematically identical** to standard attention — exact, not approximate.
 
 ---
 
-## 9. Quantization
+## 9. Quantization Methods
 
+```mermaid
+flowchart TD
+    Q["Quantization"]
+
+    Q --> PTQ["Post-Training Quantization\nNo retraining needed"]
+    Q --> QAT["Quantization-Aware Training\nSimulate noise during training\nBetter accuracy at low bits"]
+
+    PTQ --> ABS["Absmax / Symmetric\nRange: −max to +max → INT8\nGood for weights"]
+    PTQ --> ZP["Zero-Point / Asymmetric\nRange: min to max → UINT8\nGood for ReLU activations"]
+    PTQ --> PC["Per-Channel\nOne scale per output neuron\nMuch better accuracy than per-tensor"]
+    PTQ --> GPTQ["GPTQ\nINT4 weights, column-by-column\nHessian-based error compensation"]
+    PTQ --> AWQ["AWQ\nScale important channels before quant\nNo Hessian needed, faster than GPTQ"]
 ```
-FP32 → INT8 (absmax symmetric):
 
-FP32:  │────────────────┼────────────────│
-       -max_val         0            +max_val
-
-INT8:  │────────────────┼────────────────│
-       -127             0              +127
-
-scale = max_val / 127
-x_q   = round(x / scale)
-x_rec = x_q × scale
-
-Memory:  FP32 → INT8 = 4x reduction
-Speedup: INT8 GEMM = 2-4x over FP32 on Tensor Cores
-
-
-Comparison:
-
-Method   Bits  Memory   Quality   Speed   Notes
-───────────────────────────────────────────────
-FP32      32   100%     Baseline  1x      Training
-FP16      16    50%     ~Same     2x      Standard serving
-BF16      16    50%     ~Same     2x      Better range than FP16
-INT8       8    25%     -0.5%     4x      LLM.int8(), SmoothQuant
-INT4       4   12.5%    -1-3%     8x      GPTQ, AWQ, requires calib
-INT4 KV    4   12.5%    -0.5%     —       KV cache only, very effective
-```
+| Method | Bits | Memory | Quality loss | Speed |
+|--------|------|--------|-------------|-------|
+| FP16 | 16 | 50% | ~0% | 2× |
+| INT8 | 8 | 25% | <0.5% | 4× |
+| INT4 (GPTQ/AWQ) | 4 | 12.5% | 1–3% | 8× |
+| INT4 KV cache | 4 | KV only | <0.5% | — |
 
 ---
 
@@ -273,439 +281,728 @@ INT4 KV    4   12.5%    -0.5%     —       KV cache only, very effective
 
 ```mermaid
 sequenceDiagram
-    participant Draft as Draft Model (small, fast)
-    participant Target as Target Model (large, slow)
+    participant D as Draft Model (small, fast)
+    participant T as Target Model (large, slow)
 
-    Note over Draft,Target: Generate γ=4 candidate tokens
-    Draft->>Draft: token₁ ~ p_draft(·|prompt)
-    Draft->>Draft: token₂ ~ p_draft(·|prompt, token₁)
-    Draft->>Draft: token₃ ~ p_draft(·|prompt, token₁, token₂)
-    Draft->>Draft: token₄ ~ p_draft(·|...token₃)
+    Note over D: Generate γ=4 tokens autoregressively
+    D->>D: token₁ ~ p_draft(·|prompt)
+    D->>D: token₂ ~ p_draft(·|..token₁)
+    D->>D: token₃ ~ p_draft(·|..token₂)
+    D->>D: token₄ ~ p_draft(·|..token₃)
 
-    Note over Target: ONE forward pass scores all 4 tokens in parallel
-    Draft->>Target: [prompt, token₁, token₂, token₃, token₄]
-    Target->>Target: Compute p_target for each position
+    Note over T: ONE forward pass — scores all 4 positions in parallel
+    D->>T: [prompt, tok₁, tok₂, tok₃, tok₄]
+    T->>T: Compute p_target at each position
 
-    Note over Target: Accept/Reject each token
-    Target->>Target: accept₁ with prob min(1, p_target/p_draft)
-    Target->>Target: accept₂ with prob min(1, p_target/p_draft)
-    Target->>Target: REJECT token₃ → resample from adjusted dist
-    Target-->>Draft: [token₁✓, token₂✓, token₃_resampled]
+    Note over T: Accept/Reject loop
+    T->>T: tok₁ accepted  (p_t/p_d ≥ random)
+    T->>T: tok₂ accepted
+    T->>T: tok₃ REJECTED → resample from max(0, p_t−p_d)
+    T-->>D: Return [tok₁✓, tok₂✓, tok₃_new]
 ```
 
-```
-Expected speedup:
-  α = per-token acceptance rate
-  γ = draft tokens per step
+**Expected speedup:**
+| Acceptance α | E[tokens/call] | Speedup (draft 10× cheaper) |
+|-------------|---------------|----------------------------|
+| 0.5 | 1.94 | ~1.4× |
+| 0.7 | 2.77 | ~2.0× |
+| 0.9 | 4.10 | ~2.9× |
 
-  E[tokens per target call] = (1 - α^(γ+1)) / (1 - α)
-
-  α=0.5, γ=4 → E=1.94 tokens    (speedup ~1.4x)
-  α=0.7, γ=4 → E=2.77 tokens    (speedup ~2.0x)
-  α=0.9, γ=4 → E=4.10 tokens    (speedup ~2.9x)
-
-Why lossless?
-  Accepted tokens follow min(p_t, p_d) ∝ p_t after renormalization.
-  Rejected tokens resampled from max(0, p_t - p_d) / Z = p_t.
-  Combined marginal = p_target exactly. (Leviathan et al. 2023)
-```
+> **Why lossless?** Combined marginal = min(p_t, p_d)/Z + max(0, p_t−p_d)/Z = p_target exactly.
 
 ---
 
 ## 11. Tensor Parallelism (Megatron-LM)
 
-```
-FFN: d_model → 4·d_model → d_model  (split across 4 GPUs)
+```mermaid
+flowchart LR
+    X["Input X\nd_model"]
 
-         GPU 0     GPU 1     GPU 2     GPU 3
-         ─────     ─────     ─────     ─────
-X ──────►W1₀  │   W1₁  │   W1₂  │   W1₃       Column Parallel
-         │    │   │    │   │    │   │            (no AllReduce)
-         ▼    │   ▼    │   ▼    │   ▼
-        Y₀   │  Y₁   │  Y₂   │  Y₃
-         │    │   │    │   │    │   │
-        GELU  │  GELU  │  GELU  │  GELU
-         │    │   │    │   │    │   │
-         ▼    │   ▼    │   ▼    │   ▼
-    W2₀@Y₀  │ W2₁@Y₁│ W2₂@Y₂│ W2₃@Y₃   Row Parallel
-         └────┴────────┴────────┘
-                    AllReduce (sum)          ← 1 AllReduce per FFN
-                        │
-                        ▼
-                    Output Z
+    subgraph Col ["Column Parallel — no AllReduce"]
+        W0["GPU 0\nW₁[:, 0:ffn/4]"]
+        W1["GPU 1\nW₁[:, ffn/4:ffn/2]"]
+        W2["GPU 2\nW₁[:, ffn/2:3ffn/4]"]
+        W3["GPU 3\nW₁[:, 3ffn/4:]"]
+    end
 
-Communication cost: 2 AllReduce per transformer layer
-                    (1 for attention, 1 for FFN)
+    subgraph GELU ["GELU (local)"]
+        G0["GPU 0"] 
+        G1["GPU 1"]
+        G2["GPU 2"]
+        G3["GPU 3"]
+    end
+
+    subgraph Row ["Row Parallel — AllReduce at end"]
+        R0["GPU 0\nW₂[0:ffn/4, :]"]
+        R1["GPU 1\nW₂[ffn/4:ffn/2, :]"]
+        R2["GPU 2\nW₂[ffn/2:3ffn/4, :]"]
+        R3["GPU 3\nW₂[3ffn/4:, :]"]
+    end
+
+    AR(["AllReduce\nsum across GPUs"])
+    OUT["Output Z\nd_model"]
+
+    X --> W0 & W1 & W2 & W3
+    W0 --> G0 --> R0
+    W1 --> G1 --> R1
+    W2 --> G2 --> R2
+    W3 --> G3 --> R3
+    R0 & R1 & R2 & R3 --> AR --> OUT
 ```
+
+> Only **1 AllReduce per FFN layer**. Communication happens over NVLink (600 GB/s intra-node).
 
 ---
 
-## 12. Pipeline Parallelism
-
-```
-4 GPUs, 4 microbatches (mb):
-
-Time →
-GPU 0 │ mb0F │ mb1F │ mb2F │ mb3F │      │      │ mb0B │ mb1B │ mb2B │ mb3B │
-GPU 1 │      │ mb0F │ mb1F │ mb2F │ mb3F │      │      │ mb0B │ mb1B │ mb2B │
-GPU 2 │      │      │ mb0F │ mb1F │ mb2F │ mb3F │      │      │ mb0B │ mb1B │
-GPU 3 │      │      │      │ mb0F │ mb1F │ mb2F │ mb3F │      │      │ mb0B │
-       └──────────────────────────────────────────────────────────────────────►
-
-       ◄────────── bubble ─────────►   ◄──────── bubble ────────►
-       (p-1 = 3 idle steps at start)   (p-1 = 3 idle steps at end)
-
-Bubble ratio = (p-1) / (m + p - 1) = 3 / (4 + 3) = 43%  ← bad!
-
-With m=16 microbatches: bubble = 3/18 = 17%   ← acceptable
-With m=32 microbatches: bubble = 3/34 = 8.8%  ← good
-
-1F1B scheduling (Megatron): interleave forward/backward → bubble = 1/m
-```
-
----
-
-## 13. Continuous Batching
-
-```
-STATIC BATCHING:
-
-Batch 1:  Req A ████████████████████  (20 tokens)
-          Req B ████                  ( 4 tokens, padded to 20 → waste!)
-          Req C ███████████████       (15 tokens, padded → waste!)
-          Req D ██████████████████    (18 tokens, padded → waste!)
-          ▲─────────────────────────▲
-                  GPU idles while waiting for Req A to finish
-
-
-CONTINUOUS BATCHING (iteration-level scheduling):
-
-Step:   1   2   3   4   5   6   7   8   9   10  11  12
-Slot 0: A   A   A   A   A   A   A   A   A   A   E   E   ← A done at step 10, E starts
-Slot 1: B   B   B   B   F   F   F   F   F   F   F   F   ← B done at step 4, F starts
-Slot 2: C   C   C   C   C   C   C   G   G   G   G   G   ← C done at step 7, G starts
-Slot 3: D   D   D   D   D   D   D   D   D   H   H   H   ← D done at step 9, H starts
-
-GPU always running at max batch size → ~23x higher throughput (Orca paper)
-```
-
----
-
-## 14. Two-Tower Retrieval (TikTok)
+## 12. Pipeline Parallelism & Bubble
 
 ```mermaid
-graph LR
-    subgraph User Tower
-        UF["User Features<br/>age, history, device"] --> UMLP["MLP<br/>256→128"] --> UE["User Embedding<br/>128-dim L2 norm"]
+gantt
+    title Pipeline Parallelism — 4 GPUs, 4 Microbatches (F=Forward, B=Backward)
+    dateFormat  X
+    axisFormat %s
+
+    section GPU 0
+    mb0 F :0, 1
+    mb1 F :1, 2
+    mb2 F :2, 3
+    mb3 F :3, 4
+    Bubble :crit, 4, 7
+    mb0 B :7, 8
+    mb1 B :8, 9
+    mb2 B :9, 10
+    mb3 B :10, 11
+
+    section GPU 1
+    Bubble :crit, 0, 1
+    mb0 F :1, 2
+    mb1 F :2, 3
+    mb2 F :3, 4
+    mb3 F :4, 5
+    Bubble :crit, 5, 7
+    mb0 B :7, 8
+    mb1 B :8, 9
+    mb2 B :9, 10
+
+    section GPU 2
+    Bubble :crit, 0, 2
+    mb0 F :2, 3
+    mb1 F :3, 4
+    mb2 F :4, 5
+    mb3 F :5, 6
+    Bubble :crit, 6, 7
+    mb0 B :7, 8
+    mb1 B :8, 9
+
+    section GPU 3
+    Bubble :crit, 0, 3
+    mb0 F :3, 4
+    mb1 F :4, 5
+    mb2 F :5, 6
+    mb3 F :6, 7
+    mb0 B :7, 8
+```
+
+**Bubble ratio** = (p − 1) / (m + p − 1)
+
+| Microbatches (m) | Bubble (p=4) |
+|-----------------|-------------|
+| 1 | 75% |
+| 4 | 43% |
+| 16 | 17% |
+| 32 | 9% |
+
+---
+
+## 13. Continuous vs Static Batching
+
+```mermaid
+gantt
+    title Static Batching — GPU idles waiting for longest request
+    dateFormat X
+    axisFormat %s
+
+    section Batch 1
+    Req A (20 tok) :0, 20
+    Req B (padded to 20) :0, 20
+    Req C (padded to 20) :0, 20
+    Req D (padded to 20) :0, 20
+
+    section Batch 2 (waits for batch 1)
+    Req E :20, 40
+    Req F :20, 40
+    Req G :20, 40
+    Req H :20, 40
+```
+
+```mermaid
+gantt
+    title Continuous Batching — slots filled immediately on completion
+    dateFormat X
+    axisFormat %s
+
+    section Slot 0
+    Req A (20 tok) :0, 20
+    Req E (starts immediately) :20, 30
+
+    section Slot 1
+    Req B (4 tok) :0, 4
+    Req F (starts immediately) :4, 16
+
+    section Slot 2
+    Req C (7 tok) :0, 7
+    Req G (starts immediately) :7, 20
+
+    section Slot 3
+    Req D (9 tok) :0, 9
+    Req H (starts immediately) :9, 25
+```
+
+> Continuous batching = ~23× throughput improvement over static (Orca paper, 2022).
+
+---
+
+## 14. Two-Tower Retrieval — TikTok
+
+```mermaid
+flowchart LR
+    subgraph UserTower ["User Tower (online)"]
+        UF["User Features\nage · history · device"] --> UMLP["MLP 256→128"] --> UE["User Embedding\n128-dim, L2 norm"]
     end
 
-    subgraph Item Tower
-        IF["Item Features<br/>category, duration, tags"] --> IMLP["MLP<br/>256→128"] --> IE["Item Embedding<br/>128-dim L2 norm"]
+    subgraph ItemTower ["Item Tower (offline, precomputed)"]
+        IF["Item Features\ncategory · duration · tags"] --> IMLP["MLP 256→128"] --> IE["Item Embeddings\n100M items precomputed"]
     end
 
-    UE -->|dot product| SCORE["Similarity Score"]
-    IE -->|dot product| SCORE
-
-    subgraph Offline
-        IMLP2["Item Tower"] --> ALLITEMS["Pre-compute all<br/>100M+ items"] --> MILVUS["Vector DB<br/>Milvus/Faiss"]
+    subgraph VectorDB ["Vector DB (Milvus / Faiss)"]
+        IE --> IDX["ANN Index\nHNSW / IVF-PQ"]
     end
 
-    subgraph Online
-        UE2["User Embedding<br/>(computed live)"] -->|ANN Search| MILVUS --> TOP500["Top-500 Candidates<br/>~50ms"]
-    end
+    UE -->|ANN Search ~50ms| IDX --> CANDS["Top-500 Candidates"]
 ```
 
 ---
 
 ## 15. Full TikTok Recommendation Pipeline
 
-```
-User Opens App
-      │
-      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Feature Fetch  (~10ms)                                     │
-│  ┌───────────┐  ┌───────────────┐  ┌──────────────────────┐│
-│  │  Redis    │  │  Kafka/Flink  │  │  Request Context     ││
-│  │  Batch    │  │  Near-RT      │  │  (device, time, loc) ││
-│  │  Features │  │  Features     │  │  Computed inline     ││
-│  └───────────┘  └───────────────┘  └──────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Retrieval / Recall  (~70ms)                                │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐ │
-│  │ Two-Tower   │  │ Collab Filter│  │ Follow/Trending    │ │
-│  │ ANN Search  │  │ Item-CF      │  │ Rule-based         │ │
-│  │ top-500     │  │ top-200      │  │ top-100            │ │
-│  └─────────────┘  └──────────────┘  └────────────────────┘ │
-│                    Merge + Deduplicate (~800 candidates)    │
-└─────────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Pre-Ranking  (~20ms)                                       │
-│  Lightweight model, scores all 800 → top-200               │
-└─────────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Ranking  (~50ms)                                           │
-│  DLRM / DIN with full feature crosses                      │
-│  Predicts: pCTR, pLike, pShare, pFollow, pFinish           │
-│  Multi-task loss → blended score → top-50                  │
-└─────────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Post-Processing  (~10ms)                                   │
-│  Diversity enforcement, dedup, business rules, ads mix     │
-└─────────────────────────────────────────────────────────────┘
-      │
-      ▼
-   50 Videos Served   Total: <200ms
+```mermaid
+flowchart TD
+    USER["User Opens App"]
+
+    FF["Feature Fetch ~10ms\nRedis batch features\nKafka near-real-time\nRequest context inline"]
+
+    subgraph Retrieval ["Retrieval — Recall ~70ms"]
+        TT["Two-Tower ANN\ntop-500"]
+        CF["Collab Filtering\ntop-200"]
+        TR["Trending / Follow\ntop-100"]
+    end
+
+    MERGE["Merge + Dedup\n~800 candidates"]
+
+    PRE["Pre-Ranking ~20ms\nLightweight model\n→ top-200"]
+
+    RANK["Ranking ~50ms\nDLRM / DIN\npCTR · pLike · pShare · pFinish\n→ top-50"]
+
+    POST["Post-Processing ~10ms\nDiversity · Dedup\nBusiness rules · Ads mix"]
+
+    FEED["50 Videos Served\nTotal < 200ms"]
+
+    USER --> FF --> TT & CF & TR --> MERGE --> PRE --> RANK --> POST --> FEED
 ```
 
 ---
 
 ## 16. DLRM Architecture
 
-```
-Dense Features                Sparse Features
-(13 floats)                   (categorical IDs)
-     │                              │
-     ▼                         ┌───┴──────────────────────┐
- Bottom MLP                    │    Embedding Tables       │
- 13 → 64 → 32                  │  UserID  │VideoID│Tags... │
-     │                         │  1B rows │100M   │500K    │
-     │ (32-dim)                 │  64-dim  │64-dim │64-dim  │
-     └──────────────────────────┴──────────────────────────┘
-                │                          │
-                └──────────┬───────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │ Interaction │  pairwise dot products
-                    │   Layer     │  n×(n-1)/2 features
-                    └──────┬──────┘
-                           │
-                     concat with dense emb
-                           │
-                    ┌──────▼──────┐
-                    │   Top MLP   │
-                    │ → 256 → 128 │
-                    │ → 64 → 1   │
-                    └──────┬──────┘
-                           │
-                       sigmoid
-                           │
-                      pCTR  (0-1)
+```mermaid
+flowchart TD
+    DF["Dense Features\n13 floats"] --> BMLP["Bottom MLP\n13 → 64 → 32-dim"]
+
+    subgraph EmbTables ["Embedding Tables — sharded across param servers"]
+        UID["User ID\n1B rows · 64-dim"]
+        VID["Video ID\n100M rows · 64-dim"]
+        TAGS["Interest Tags\n500K rows · 64-dim"]
+    end
+
+    BMLP --> INT
+    UID & VID & TAGS --> INT
+
+    INT["Interaction Layer\nPairwise dot products\nn×n-1÷2 features"]
+
+    INT --> CONCAT["Concat with dense embedding"]
+
+    CONCAT --> TMLP["Top MLP\n→ 256 → 128 → 64 → 1"]
+
+    TMLP --> SIG["Sigmoid → pCTR"]
 ```
 
 ---
 
-## 17. Triton Kernel Mental Model
-
-```
-CUDA Thread Hierarchy:
-
-Grid (launches kernel)
-  └── Blocks (share shared mem, __syncthreads)
-        └── Warps (32 threads, execute in lockstep SIMT)
-              └── Threads (individual execution units)
-
-Triton abstracts this:
-  - program_id = which tile/block this instance handles
-  - tl.arange(0, BLOCK_SIZE) = the vector of thread indices
-  - tl.load / tl.store = vectorized HBM access with masking
-  - No manual shared memory management!
-
-
-Softmax Kernel (fused, one HBM read + one write):
-
- @triton.jit
- def softmax_kernel(input_ptr, output_ptr, n_cols, BLOCK_SIZE):
-     row = tl.program_id(0)                    # one program per row
-     offsets = tl.arange(0, BLOCK_SIZE)
-     x = tl.load(input_ptr + row * n_cols + offsets, mask=offsets < n_cols)
-     # All computation in SRAM (registers):
-     x_max = tl.max(x, axis=0)
-     x = tl.exp(x - x_max)
-     x = x / tl.sum(x, axis=0)
-     tl.store(output_ptr + row * n_cols + offsets, x, mask=offsets < n_cols)
-
-
-Unfused (PyTorch, 3 kernels):   Read → Write → Read → Write → Read → Write
-Fused (Triton, 1 kernel):       Read ─────────────────────────────────► Write
-                                       all math in SRAM
-```
-
----
-
-## 18. Tiled Matrix Multiply (CUDA GEMM)
-
-```
-Naive GEMM: C[i,j] = sum_k A[i,k] * B[k,j]
-
-For every (i,j): loads row i of A and col j of B from HBM repeatedly
-→ Total HBM reads: O(n³)  (same data loaded n times!)
-
-Tiled GEMM (TILE=32):
-
-A (M×K):                    B (K×N):
-
-┌────┬────┬────┐             ┌──┬──┬──┐
-│ A₀₀│ A₀₁│ A₀₂│             │B₀₀B₁₀B₂₀│
-├────┼────┼────┤             ├──┼──┼──┤
-│ A₁₀│ A₁₁│ A₁₂│             │B₀₁B₁₁B₂₁│
-└────┴────┴────┘             └──┴──┴──┘
-
-For each output tile C[i,j]:
-  for k_tile in range(K/TILE):
-      Load A[i, k_tile] → shared mem    ← one HBM read per tile
-      Load B[k_tile, j] → shared mem    ← one HBM read per tile
-      __syncthreads()
-      compute partial C[i,j] from SRAM  ← fast, no HBM
-      __syncthreads()
-
-Total HBM reads: O(n³/TILE)  → TILE=32 = 32x fewer HBM reads!
-Arithmetic intensity: O(TILE) → compute-bound for large TILE
-```
-
----
-
-## 19. Beam Search vs Sampling
-
-```
-Vocabulary logits (simplified, vocab=5):
-  Token:   A     B     C     D     E
-  Logit:  [2.1,  0.5,  1.8,  0.2,  0.4]
-  Prob:   [0.47, 0.06, 0.35, 0.04, 0.07]
-
-GREEDY (beam=1):    always pick argmax → A  (deterministic, often repetitive)
-
-BEAM SEARCH (beam=3):
-  Step 1: keep top-3 → {A:0.47, C:0.35, E:0.07}
-  Step 2: expand each, score = prev_score + log(p_new)
-           keep global top-3 sequences
-  → Finds higher-probability sequences than greedy
-  → Still deterministic, less repetitive than greedy
-
-TOP-K SAMPLING (k=3):
-  → Sample from {A, B, C} only (zero out rest)
-  → Random, diverse outputs
-
-TOP-P / NUCLEUS (p=0.9):
-  Sorted: A(0.47) + C(0.35) = 0.82 < 0.9
-          A(0.47) + C(0.35) + E(0.07) = 0.89 < 0.9
-          A(0.47) + C(0.35) + E(0.07) + B(0.06) = 0.95 ≥ 0.9
-  → Sample from {A, C, E, B}
-  → Adapts vocab size to distribution sharpness (better than top-k)
-
-TEMPERATURE:
-  Low  (T=0.1): sharper → more deterministic (prefer high-prob tokens)
-  High (T=2.0): flatter  → more random (explores low-prob tokens)
-```
-
----
-
-## 20. Key Numbers Cheat Sheet
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   HARDWARE                              │
-├──────────────────────────────────┬──────────────────────┤
-│ A100 FP16 Tensor Core            │ 312 TFLOPS           │
-│ A100 HBM bandwidth               │ 2 TB/s               │
-│ A100 HBM capacity                │ 80 GB                │
-│ A100 NVLink (intra-node)         │ 600 GB/s             │
-│ InfiniBand 400G (inter-node)     │ 50 GB/s              │
-│ PCIe 4.0                         │ 32 GB/s              │
-│ A100 → A100 NVLink latency       │ ~1 μs                │
-├──────────────────────────────────┼──────────────────────┤
-│                   MODELS                                │
-├──────────────────────────────────┼──────────────────────┤
-│ LLaMA-7B  FP16                   │ ~14 GB               │
-│ LLaMA-7B  INT8                   │ ~7 GB                │
-│ LLaMA-7B  INT4                   │ ~3.5 GB              │
-│ LLaMA-70B FP16                   │ ~140 GB              │
-│ LLaMA-70B INT8                   │ ~70 GB               │
-│ KV cache (70B, 1 tok, FP16)      │ ~2.6 MB              │
-│ KV cache (7B,  1 tok, FP16)      │ ~0.25 MB             │
-├──────────────────────────────────┼──────────────────────┤
-│                   TECHNIQUES                            │
-├──────────────────────────────────┼──────────────────────┤
-│ Continuous batching speedup      │ ~23x vs static       │
-│ Flash Attention speedup          │ 2–4x                 │
-│ Speculative decoding speedup     │ 2–3x                 │
-│ INT8 GEMM speedup vs FP32        │ 2–4x                 │
-│ Spec decode acceptance (α=0.8)   │ E=3.36 tok/call      │
-└──────────────────────────────────┴──────────────────────┘
-```
-
----
-
-## 21. Decision Tree: Which Optimization to Use?
+## 17. Triton Kernel Thread Model
 
 ```mermaid
-graph TD
-    START["Inference is too slow / expensive"]
+flowchart TD
+    GRID["Grid\nlaunches kernel\nN programs"]
 
-    START --> Q1{"Bottleneck?"}
+    subgraph Program ["One Program (like a CUDA block)"]
+        PID["program_id = which tile"]
+        RANGE["tl.arange = thread indices within block"]
+        LOAD["tl.load — vectorized HBM read with mask"]
+        COMPUTE["Computation in registers / SRAM"]
+        STORE["tl.store — vectorized HBM write"]
+    end
 
-    Q1 -->|Memory-bound<br/>small batch, decode| MEM["Memory Optimizations"]
-    Q1 -->|Compute-bound<br/>large batch, prefill| COMP["Compute Optimizations"]
-    Q1 -->|Model too big<br/>for single GPU| DIST["Distributed Inference"]
+    GRID --> Program
 
-    MEM --> M1["Larger batch size<br/>→ better GPU utilization"]
-    MEM --> M2["Continuous batching<br/>→ ~23x throughput"]
-    MEM --> M3["Quantize KV cache<br/>→ INT8/INT4 KV"]
-    MEM --> M4["Speculative decoding<br/>→ 2-3x decode speedup"]
-
-    COMP --> C1["INT8 / FP16 quantization<br/>→ 2-4x GEMM speedup"]
-    COMP --> C2["Flash Attention<br/>→ 2-4x attention speedup"]
-    COMP --> C3["Kernel fusion<br/>→ reduce HBM trips"]
-    COMP --> C4["Custom Triton kernels<br/>→ fused ops"]
-
-    DIST --> D1{"#GPUs?"}
-    D1 -->|2-8, same node| D2["Tensor Parallelism<br/>NVLink bandwidth"]
-    D1 -->|>8, multi-node| D3["Tensor + Pipeline<br/>Parallelism 3D"]
-    D1 -->|Multiple replicas| D4["Data Parallelism<br/>independent copies"]
+    subgraph Fused ["Fused Softmax — 1 kernel vs PyTorch's 3"]
+        R1["Read row from HBM → SRAM"]
+        R2["Compute max (numerical stability)"]
+        R3["Compute exp, sum — all in SRAM"]
+        R4["Normalize — SRAM"]
+        R5["Write result → HBM"]
+        R1 --> R2 --> R3 --> R4 --> R5
+    end
 ```
+
+> **No manual shared memory management.** Triton auto-tiles and schedules warps. Write tiled kernels in Python with near-CUDA performance.
+
+---
+
+## 18. Tiled GEMM vs Naïve GEMM
+
+```mermaid
+flowchart LR
+    subgraph Naive ["Naïve GEMM — O(n³) HBM reads"]
+        NA["For each C[i,j]:\nLoad row i of A from HBM\nLoad col j of B from HBM\nCompute dot product"]
+    end
+
+    subgraph Tiled ["Tiled GEMM — O(n³ ÷ TILE) HBM reads"]
+        TA["Load A-tile into SRAM\n(32×32 block)"]
+        TB["Load B-tile into SRAM\n(32×32 block)"]
+        TC["Compute all dot products\nwithin tile — stay in SRAM"]
+        TD["Move to next tile\naccumulate into C"]
+        TA --> TC
+        TB --> TC
+        TC --> TD --> TA
+    end
+```
+
+> TILE=32 → 32× fewer HBM reads. Arithmetic intensity scales with TILE → compute-bound for large tiles.
+
+---
+
+## 19. Sampling Strategies
+
+```mermaid
+flowchart TD
+    LOGITS["Logits from model\n[2.1, 0.5, 1.8, 0.2, 0.4]\n→ probs [0.47, 0.06, 0.35, 0.04, 0.07]"]
+
+    LOGITS --> GREEDY["Greedy\nargmax → always token A\nDeterministic, repetitive"]
+
+    LOGITS --> BEAM["Beam Search k=3\nKeep top-3 sequences\nexpand each step\nHigher prob than greedy"]
+
+    LOGITS --> TOPK["Top-K k=3\nSample from {A, C, E}\nFixed vocab size"]
+
+    LOGITS --> TOPP["Top-P nucleus p=0.9\nSort by prob, take until cumsum ≥ 0.9\n→ {A, C, E, B}\nAdaptive vocab — better than top-k"]
+
+    LOGITS --> TEMP["Temperature\nT<1 → sharper → deterministic\nT>1 → flatter → creative"]
+```
+
+---
+
+## 20. Which Optimization to Apply
+
+```mermaid
+flowchart TD
+    START["Inference too slow / expensive"]
+    START --> Q1{"What's the bottleneck?"}
+
+    Q1 -->|Memory-bound\nsmall batch, decode phase| MEM
+    Q1 -->|Compute-bound\nlarge batch, prefill phase| COMP
+    Q1 -->|Model too large\nfor single GPU| DIST
+
+    subgraph MEM ["Memory Optimizations"]
+        M1["Larger batch size"]
+        M2["Continuous batching → ~23×"]
+        M3["INT8 / INT4 KV cache → 2–4× more tokens"]
+        M4["Speculative decoding → 2–3× decode"]
+    end
+
+    subgraph COMP ["Compute Optimizations"]
+        C1["INT8 weights → 2–4× GEMM"]
+        C2["Flash Attention → 2–4× attention"]
+        C3["Kernel fusion → fewer HBM trips"]
+        C4["Custom Triton kernels"]
+    end
+
+    subgraph DIST ["Distributed Inference"]
+        D1{"How many GPUs?"}
+        D1 -->|2–8 same node NVLink| D2["Tensor Parallelism"]
+        D1 -->|Multi-node| D3["Tensor + Pipeline\n3D Parallelism"]
+        D1 -->|Multiple replicas| D4["Data Parallelism"]
+    end
+```
+
+---
+
+## 21. Key Numbers Cheat Sheet
+
+| Category | Metric | Value |
+|----------|--------|-------|
+| **A100** | FP16 Tensor Core peak | 312 TFLOPS |
+| **A100** | HBM bandwidth | 2 TB/s |
+| **A100** | HBM capacity | 80 GB |
+| **A100** | NVLink (intra-node) | 600 GB/s |
+| **Network** | InfiniBand 400G | 50 GB/s |
+| **Network** | PCIe 4.0 | 32 GB/s |
+| **Models** | LLaMA-7B INT8 | ~7 GB |
+| **Models** | LLaMA-70B INT8 | ~70 GB |
+| **KV Cache** | 70B model, 1 token FP16 | ~2.6 MB |
+| **KV Cache** | 7B model, 1 token FP16 | ~0.25 MB |
+| **Speedups** | Continuous batching vs static | ~23× |
+| **Speedups** | Flash Attention | 2–4× |
+| **Speedups** | Speculative decoding (α=0.8) | ~2.5× |
+| **Speedups** | INT8 GEMM vs FP32 | 2–4× |
 
 ---
 
 ## 22. Interview Answer Templates
 
 **Q: Walk me through a full LLM inference request.**
+
+```mermaid
+flowchart TD
+    A["Request arrives\nGateway: auth, rate-limit token bucket"] -->
+    B["Scheduler admits request\nPagedAttention allocates KV blocks"] -->
+    C["PREFILL: prompt processed in parallel\nK,V stored in cache"] -->
+    D["DECODE loop\nContinuous batch scheduler adds/removes each step"] -->
+    E["Optional: draft model generates γ tokens\nTarget model verifies in one forward pass"] -->
+    F["Sample next token\nnucleus / greedy"] -->
+    G["Append K,V to cache\nStream token to client"] -->
+    H{"EOS or max_len?"}
+    H -->|No| D
+    H -->|Yes| I["Free KV cache blocks\nRemove from batch"]
 ```
-1. Request arrives → Gateway validates, rate-limits (token bucket)
-2. Scheduler admits request → KV cache pages allocated (PagedAttention)
-3. PREFILL: prompt tokens processed in parallel → K,V stored in cache
-4. DECODE loop:
-     a. Continuous batch scheduler adds/removes requests each step
-     b. (Optional) Draft model generates γ tokens speculatively
-     c. Target model forward pass: computes Q for new tokens,
-        attends over full KV cache, generates logit distribution
-     d. Sample next token (nucleus/greedy)
-     e. Append K,V to cache, send token to client (streaming)
-5. EOS token or max_len → free KV cache pages, remove from batch
+
+**Q: How do you cut serving cost 2×?**
+
+```mermaid
+flowchart LR
+    OPT["2× Cost Reduction"]
+    OPT --> A["INT8 weights\nSmoothQuant or GPTQ\n&lt;0.5% quality loss\n→ 2× memory, 2–4× GEMM"]
+    OPT --> B["Continuous batching\nif not already deployed\n→ up to 23× throughput"]
+    OPT --> C["Speculative decoding\n7B draft + 70B target\n→ 2–3× decode speedup"]
+    OPT --> D["INT8 KV cache\n→ 2× more tokens in flight"]
+    A & B & C & D --> E["Combined: 5–8× total\npick based on latency vs throughput priority"]
 ```
 
-**Q: How would you reduce LLM serving cost by 2x?**
+---
+
+---
+
+# GPU KERNELS DEEP DIVE ← Primary Interview Focus
+
+---
+
+## G1. CUDA Thread Hierarchy
+
+```mermaid
+flowchart TD
+    GRID["Grid\nAll thread blocks for one kernel launch"]
+
+    subgraph SM0 ["Streaming Multiprocessor (SM)"]
+        BLK0["Block 0\nUp to 1024 threads\nShared SRAM 164 KB"]
+        BLK1["Block 1"]
+        BLK2["Block 2"]
+    end
+
+    subgraph BLK0_detail ["Block internals"]
+        W0["Warp 0\n32 threads — lockstep SIMT"]
+        W1["Warp 1\n32 threads"]
+        WN["Warp N..."]
+        W0 --> T0["Thread 0\nRegisters ~255"]
+        W0 --> T1["Thread 1"]
+        W0 --> TN["... Thread 31"]
+    end
+
+    GRID --> SM0
+    SM0 --> BLK0_detail
 ```
-Option A — Quantization (easiest, ~2x):
-  FP16 → INT8 weights: 2x memory, 2-4x GEMM speedup, <0.5% quality loss
-  Use SmoothQuant or GPTQ; keep activations in FP16.
 
-Option B — Continuous batching (if not already):
-  Static → continuous: up to 23x throughput, same latency budget.
+| Resource | A100 limit | Effect when exceeded |
+|----------|-----------|---------------------|
+| Threads/block | 1024 | Kernel launch fails |
+| Registers/thread | 255 | Register spilling to local mem |
+| Shared mem/block | 164 KB | Fewer blocks per SM → low occupancy |
+| Blocks/SM | 32 | Hard cap |
+| Warps/SM | 64 (2048 threads) | Occupancy ceiling |
 
-Option C — Speculative decoding (if latency-bound):
-  Deploy 7B draft + 70B target: 2-3x decode speedup, same quality.
+---
 
-Option D — KV cache quantization:
-  INT8 KV cache: 2x more tokens in flight → 2x higher batch size.
+## G2. Warp Execution & Divergence
 
-Best combo: INT8 + continuous batching + speculative decode = 5-8x total.
+```mermaid
+flowchart LR
+    subgraph NoDivergence ["No Divergence — all 32 threads same path"]
+        ND1["Thread 0..31\nx = data * 2.0"]
+        ND2["All finish same cycle"]
+        ND1 --> ND2
+    end
+
+    subgraph Divergence ["Divergence — if/else splits warp"]
+        D1["Threads 0..15: branch A\nx = data * 2.0"]
+        D2["Threads 16..31: branch B\nx = data + 1.0"]
+        D3["Warp serializes:\nFirst executes A (16 active, 16 masked)\nThen executes B (16 active, 16 masked)\n→ 2× slower"]
+        D1 --> D3
+        D2 --> D3
+    end
+```
+
+**Fix:** use predicated execution — compute both branches, `select` with mask. No branching, no serialization.
+
+---
+
+## G3. Memory Coalescing
+
+```mermaid
+flowchart TD
+    subgraph Coalesced ["✅ Coalesced — 1 HBM transaction"]
+        C_T["Thread i reads A[i]\nAll 32 addresses contiguous\n128 bytes = 1 cache line"]
+    end
+
+    subgraph Strided ["❌ Strided — 32 HBM transactions"]
+        S_T["Thread i reads A[i × 32]\nAddresses jump by 128 bytes each\n32 separate cache lines"]
+    end
+
+    subgraph Gathered ["❌ Random gather — worst case"]
+        G_T["Thread i reads A[random[i]]\nUp to 32 separate cache lines\n32× bandwidth cost"]
+    end
+
+    HBM["HBM\n2 TB/s peak"]
+    Coalesced -->|"1 tx = 128 bytes"| HBM
+    Strided -->|"32 tx = 32×128 bytes"| HBM
+    Gathered -->|"32 tx scattered"| HBM
+```
+
+**Common mistake:** accessing a matrix column-major when it's stored row-major.
+**Fix:** transpose the matrix, or use shared memory to do a coalesced load then transpose in SRAM.
+
+---
+
+## G4. Shared Memory Bank Conflicts
+
+```mermaid
+flowchart LR
+    subgraph Banks ["32 Shared Memory Banks (4 bytes each)"]
+        B0["Bank 0"]
+        B1["Bank 1"]
+        B2["Bank 2"]
+        BN["...Bank 31"]
+    end
+
+    subgraph Good ["✅ Stride-1: no conflict"]
+        G0["Thread 0 → Bank 0"]
+        G1["Thread 1 → Bank 1"]
+        G2["Thread 2 → Bank 2"]
+    end
+
+    subgraph Bad ["❌ Stride-16: 2-way conflict"]
+        BAD0["Thread 0 → Bank 0"]
+        BAD16["Thread 16 → Bank 0\n→ serialized!"]
+    end
+
+    subgraph Broadcast ["✅ Broadcast: no conflict"]
+        BR["All 32 threads → same address\n→ multicast, 1 transaction"]
+    end
+
+    Good --> Banks
+    Bad --> Banks
+    Broadcast --> Banks
+```
+
+**Element i → bank**: `(i × sizeof(element) / 4) % 32`
+
+---
+
+## G5. Occupancy & Latency Hiding
+
+```mermaid
+flowchart TD
+    ISSUE["Thread issues HBM load\n~600 cycle latency"]
+
+    subgraph HighOcc ["High Occupancy — many warps resident"]
+        W1_HO["Warp 1: waiting for HBM"]
+        W2_HO["Warp 2: EXECUTING ← SM switches here"]
+        W3_HO["Warp 3: waiting"]
+        W4_HO["Warp 4: NEXT"]
+        W1_HO --> W2_HO --> W3_HO --> W4_HO
+    end
+
+    subgraph LowOcc ["Low Occupancy — few warps resident"]
+        W1_LO["Warp 1: waiting for HBM"]
+        STALL["SM STALLS — no other warp to run\n→ cycles wasted"]
+        W1_LO --> STALL
+    end
+
+    ISSUE --> HighOcc
+    ISSUE --> LowOcc
+```
+
+**Target:** ≥ 50% occupancy for memory-bound kernels. Compute-bound kernels can tolerate lower.
+
+---
+
+## G6. Kernel Fusion — Why It Matters
+
+```mermaid
+flowchart LR
+    subgraph Unfused ["Unfused (3 separate kernels)"]
+        U1["Kernel 1: x = x * 2\nRead HBM → Write HBM"]
+        U2["Kernel 2: x = exp(x)\nRead HBM → Write HBM"]
+        U3["Kernel 3: x = x / sum(x)\nRead HBM → Write HBM"]
+        U1 --> U2 --> U3
+    end
+
+    subgraph Fused ["Fused (1 Triton kernel)"]
+        F1["Read HBM once"]
+        F2["x * 2 → SRAM"]
+        F3["exp(x) → SRAM"]
+        F4["/ sum → SRAM"]
+        F5["Write HBM once"]
+        F1 --> F2 --> F3 --> F4 --> F5
+    end
+
+    HBM2["HBM\n2 TB/s"]
+    Unfused -->|"6 HBM transactions"| HBM2
+    Fused -->|"2 HBM transactions\n3× fewer bytes"| HBM2
+```
+
+---
+
+## G7. Tiled GEMM — Shared Memory Tiling
+
+```mermaid
+flowchart TD
+    subgraph Output ["Output tile C[i,j] — BLOCK_M × BLOCK_N"]
+        ACC["Accumulator in registers\nFP32 for stability"]
+    end
+
+    subgraph KTiles ["Iterate over K tiles"]
+        KT1["k=0: Load A[i, 0:BLOCK_K] → SRAM\n     Load B[0:BLOCK_K, j] → SRAM\n     tl.dot(A_tile, B_tile) → acc"]
+        KT2["k=1: Load next A, B tiles\n     acc += tl.dot(...)"]
+        KTN["... repeat K/BLOCK_K times"]
+        KT1 --> KT2 --> KTN --> ACC
+    end
+
+    ACC --> WRITE["Write C tile → HBM\nOnce per output tile"]
+
+    note["BLOCK_K=64: arithmetic intensity = BLOCK_K/2 = 32 FLOPs/byte\nAt BLOCK_K=128: 64 FLOPs/byte → near ridge point\ntl.dot automatically uses Tensor Cores on FP16/BF16"]
+```
+
+---
+
+## G8. Flash Attention Tiling Algorithm
+
+```mermaid
+flowchart TD
+    INIT["For each Q block Qi:\nInitialize m_i = -inf, l_i = 0, O_i = 0"]
+
+    subgraph KVLoop ["Loop over K,V blocks (j = 0..N/BLOCK_N)"]
+        LOAD["Load Kj, Vj → SRAM"]
+        SCORE["S = Qi @ Kj.T × scale\n(BLOCK_N × BLOCK_N, stays in SRAM)"]
+        MMAX["m_new = max(m_i, rowmax(S))"]
+        EXP["P = exp(S - m_new)\nnumerically stable"]
+        LSUM["l_new = exp(m_i - m_new) × l_i + rowsum(P)"]
+        UPDATE["O_i = (exp(m_i-m_new) × O_i + P @ Vj)"]
+        STATE["m_i, l_i = m_new, l_new"]
+        LOAD --> SCORE --> MMAX --> EXP --> LSUM --> UPDATE --> STATE --> LOAD
+    end
+
+    FINAL["O_i = O_i / l_i\nWrite to HBM — once!"]
+
+    INIT --> KVLoop --> FINAL
+```
+
+**Why no n×n matrix in HBM:** S is computed tile-by-tile inside SRAM and discarded after each iteration. Only O (output) and running stats (m, l) are kept.
+
+---
+
+## G9. Triton Programming Model
+
+```mermaid
+flowchart LR
+    subgraph Triton ["Triton Kernel Structure"]
+        PID["program_id(axis)\n= which tile this instance handles\n(like blockIdx in CUDA)"]
+        ARANGE["tl.arange(0, BLOCK_SIZE)\n= element indices for this tile\n(like threadIdx, vectorized)"]
+        MASK["mask = offsets < N\nprevents OOB access\nno explicit if/else needed"]
+        LOAD["tl.load(ptr + offsets, mask=mask)\nvectorized coalesced HBM read"]
+        COMPUTE["Arithmetic on vectors\nauto-vectorized, uses Tensor Cores\nfor tl.dot on fp16/bf16"]
+        STORE["tl.store(ptr + offsets, val, mask)\nvectorized coalesced HBM write"]
+        PID --> ARANGE --> MASK --> LOAD --> COMPUTE --> STORE
+    end
+```
+
+**Key Triton ops:**
+
+| Op | What it does |
+|----|-------------|
+| `tl.load(ptr, mask)` | Vectorized HBM read |
+| `tl.store(ptr, val, mask)` | Vectorized HBM write |
+| `tl.dot(a, b)` | Tiled matmul → Tensor Cores |
+| `tl.max(x, axis)` | Reduction |
+| `tl.sum(x, axis)` | Reduction |
+| `tl.exp(x)` | Elementwise |
+| `tl.program_id(0)` | Which tile |
+| `tl.constexpr` | Compile-time constant (tile sizes) |
+
+---
+
+## G10. Kernels You Should Know How to Write
+
+```mermaid
+flowchart TD
+    KERNELS["Triton Kernels to Master"]
+
+    KERNELS --> SM["Fused Softmax\none HBM read, online stable softmax\nsee 11_gpu_kernels_deep.py"]
+    KERNELS --> LN["Fused LayerNorm\nmean+var in one pass\nsee 11_gpu_kernels_deep.py"]
+    KERNELS --> GE["Fused GELU\ntanh approximation\nsee 11_gpu_kernels_deep.py"]
+    KERNELS --> MM["Tiled GEMM\nSRAM tiling, Tensor Cores via tl.dot\nsee 11_gpu_kernels_deep.py"]
+    KERNELS --> FA["Flash Attention Fwd\nonline softmax, O(N) memory\nsee 11_gpu_kernels_deep.py"]
+    KERNELS --> RMS["RMSNorm\nsimplified LayerNorm, used in LLaMA\nno mean subtraction"]
+    KERNELS --> ROT["RoPE (Rotary Embeddings)\nelementwise rotation on Q,K\nfuse with attention QK proj"]
+```
+
+---
+
+## G11. GPU Profiling Workflow
+
+```mermaid
+flowchart TD
+    SLOW["Kernel is slow / GPU underutilized"]
+
+    SLOW --> NSYS["nsys profile python script.py\nTimeline: see kernel launches,\nmemory copies, sync points"]
+
+    NSYS --> NCU["ncu --set full python script.py\nPer-kernel deep metrics"]
+
+    subgraph Metrics ["Key ncu Metrics"]
+        M1["sm__throughput → SM busy %"]
+        M2["dram__bytes → HBM traffic"]
+        M3["l1tex__t_bytes → L1 traffic"]
+        M4["sm__sass_tensor_core_instns → Tensor Core use"]
+        M5["Roofline: FLOPs / dram__bytes → memory vs compute bound"]
+    end
+
+    NCU --> Metrics
+
+    Metrics --> FIX["Fix based on bottleneck"]
+
+    subgraph Fixes ["Common Fixes"]
+        F1["Memory-bound:\nFuse kernels, reduce HBM traffic"]
+        F2["Low occupancy:\nReduce register/shared mem pressure\nIncrease BLOCK_SIZE"]
+        F3["Bank conflicts:\nPad shared memory arrays"]
+        F4["Warp divergence:\nReplace branches with predication"]
+        F5["No Tensor Cores:\nUse fp16/bf16, align tiles to 16"]
+    end
+
+    FIX --> Fixes
 ```
