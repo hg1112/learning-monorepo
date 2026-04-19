@@ -478,15 +478,23 @@ _setup_repo_nodesource() {
 
 _setup_repo_cuda() {
   [[ -f /etc/apt/sources.list.d/cuda.list ]] && return
-  local codename="$DISTRO_CODENAME"
   local rel; rel=$(lsb_release -sr | tr -d '.')
   local cuda_deb="cuda-keyring_1.1-1_all.deb"
   local url
+
   if [[ "$DISTRO_ID" == "ubuntu" ]]; then
-    url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${rel}/x86_64/${cuda_deb}"
+    # Try exact release first; fall back to latest known supported (2404)
+    local try_url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${rel}/x86_64/${cuda_deb}"
+    if wget -q --spider "$try_url" 2>/dev/null; then
+      url="$try_url"
+    else
+      log_warn "No CUDA repo for ubuntu${rel} — falling back to ubuntu2404"
+      url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/${cuda_deb}"
+    fi
   else
     url="https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${cuda_deb}"
   fi
+
   wget -qO "/tmp/${cuda_deb}" "$url"
   sudo dpkg -i "/tmp/${cuda_deb}"
 }
@@ -955,10 +963,9 @@ install_cuda() {
   command -v nvcc &>/dev/null && { log_warn "CUDA already installed, skipping"; return; }
   log_info "Installing CUDA toolkit..."
   sudo apt-get install -y -qq cuda-toolkit
-  echo 'export PATH=/usr/local/cuda/bin:$PATH' \
-    | sudo tee /etc/profile.d/cuda.sh >/dev/null
-  echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' \
-    >> /etc/profile.d/cuda.sh
+  { echo 'export PATH=/usr/local/cuda/bin:$PATH'
+    echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}'
+  } | sudo tee /etc/profile.d/cuda.sh >/dev/null
   log_success "CUDA installed (nvcc: $(nvcc --version 2>&1 | grep release | awk '{print $5}'))"
 }
 
@@ -980,12 +987,21 @@ _ensure_conda() {
 install_ai_stack() {
   _ensure_conda
 
-  # Create dev env if it doesn't exist
-  if ! conda info --envs | awk '{print $1}' | grep -qx "dev"; then
+  # Accept Anaconda ToS (required since conda 24.x for default channels)
+  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
+  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r    2>/dev/null || true
+
+  # ── dev env ───────────────────────────────────────────────────────────────
+  if ! conda info --envs 2>/dev/null | awk '{print $1}' | grep -qx "dev"; then
     log_info "Creating conda env 'dev' with Python 3.12..."
     conda create -n dev python=3.12 -y -q
   else
     log_info "conda env 'dev' already exists"
+  fi
+
+  if ! conda info --envs 2>/dev/null | awk '{print $1}' | grep -qx "dev"; then
+    log_error "conda env 'dev' creation failed — aborting AI stack install"
+    return 1
   fi
 
   # Determine torch index (CPU vs CUDA)
@@ -1000,7 +1016,24 @@ install_ai_stack() {
   local ort_pkg="onnxruntime"
   _gpu_present && $INSTALL_CUDA && ort_pkg="onnxruntime-gpu"
 
-  local pip="conda run -n dev pip install -q --upgrade"
+  # No --upgrade: let pip's resolver pick compatible versions.
+  # Pinning conflict-prone packages upfront guides the resolver for everything installed after.
+  local pip="conda run -n dev pip install -q"
+
+  log_info "Pinning conflict-prone base packages..."
+  $pip \
+    "typing-extensions>=4.14,<5" \
+    "protobuf>=4.25.8,<6" \
+    "cryptography>=43,<47" \
+    "sqlalchemy>=2.0,<3" \
+    "jinja2>=3.1.6,<4" \
+    "pendulum>=3.1.0,<4" \
+    "pluggy>=1.6" \
+    "cffi>=1.17.1" \
+    "requests>=2.32.5,<3" \
+    "fsspec>=2024.1,<2026.3" \
+    "opentelemetry-api>=1.33" \
+    "opentelemetry-sdk>=1.33"
 
   log_info "Installing core ML packages..."
   $pip numpy pandas polars scikit-learn
@@ -1011,28 +1044,22 @@ install_ai_stack() {
 
   log_info "Installing HuggingFace ecosystem..."
   $pip transformers datasets accelerate peft \
-    sentence-transformers huggingface_hub[cli] \
+    "sentence-transformers" "huggingface_hub[cli]" \
     "$ort_pkg"
 
   log_info "Installing LLM / RAG frameworks..."
-  $pip \
-    langchain langchain-huggingface langchain-community \
+  $pip langchain langchain-huggingface langchain-community \
     llama-index openai
 
   log_info "Installing MLOps / orchestration..."
-  local python_ver
-  python_ver=$(conda run -n dev python --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
-  $pip mlflow[extras] prefect "dvc[s3]" "ray[default]" "dask[complete]"
-  conda run -n dev pip install -q \
-    "apache-airflow==${AIRFLOW_VERSION}" \
-    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${python_ver}.txt"
+  # mlflow without [extras] avoids pulling in conflicting optional deps
+  $pip mlflow prefect "dvc[s3]" "ray[default]" "dask[complete]"
 
   log_info "Installing model serving..."
-  $pip torchserve torch-model-archiver torch-workflow-archiver \
-    bentoml "tritonclient[all]"
+  $pip torch-model-archiver torch-workflow-archiver bentoml
 
-  log_info "Installing vector / feature stores..."
-  $pip chromadb feast milvus-lite
+  log_info "Installing vector stores..."
+  $pip chromadb milvus-lite
 
   log_info "Installing data quality + PySpark..."
   $pip great-expectations pyspark
@@ -1040,9 +1067,21 @@ install_ai_stack() {
   log_info "Installing Jupyter Lab..."
   $pip jupyterlab
 
-  log_success "AI stack installed in conda env 'dev'"
-  log_info "Activate with: conda activate dev"
-  log_info "Start Jupyter: conda run -n dev jupyter lab --ip=0.0.0.0 --port=8888 --no-browser"
+  # ── airflow env (isolated — conflicts with prefect over sqlalchemy) ───────
+  log_info "Creating isolated conda env 'airflow' (Python 3.11)..."
+  if ! conda info --envs 2>/dev/null | awk '{print $1}' | grep -qx "airflow"; then
+    conda create -n airflow python=3.11 -y -q
+  fi
+  local af_py
+  af_py=$(conda run -n airflow python --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+  conda run -n airflow pip install -q \
+    "apache-airflow==${AIRFLOW_VERSION}" \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${af_py}.txt"
+
+  log_success "AI stack installed"
+  log_info "  ML/LLM env : conda activate dev"
+  log_info "  Airflow env: conda activate airflow"
+  log_info "  Jupyter    : conda run -n dev jupyter lab --ip=0.0.0.0 --port=8888 --no-browser"
 }
 
 # ─── Service startup ──────────────────────────────────────────────────────────
@@ -1137,7 +1176,8 @@ print_summary() {
   $INSTALL_RUST    && log_success "Rust:   (restart shell, then: rustc --version)"
   $INSTALL_BAZEL   && log_success "Bazel:  $(bazel --version 2>/dev/null | head -1)"
   $INSTALL_SPARK   && log_success "Spark:  ${SPARK_VERSION} at /opt/spark"
-  $INSTALL_AI_STACK && log_success "AI env: conda activate dev"
+  $INSTALL_AI_STACK && log_success "AI env : conda activate dev  (ML/LLM stack)"
+  $INSTALL_AI_STACK && log_success "Airflow: conda activate airflow"
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
