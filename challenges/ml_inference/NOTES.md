@@ -16,19 +16,29 @@ ByteDance · April 21, 2026
 - [Speculative Decoding: 3× Faster LLM Inference with Zero Quality Loss](https://www.youtube.com/watch?v=Qh9cIEelCj4)
 - [Faster LLMs: Accelerate Inference with Speculative Decoding](https://www.youtube.com/watch?v=VkWlLSTdHs8)
 
-### GPU Kernels & Triton ← PRIMARY FOCUS
-- [Triton GPU Kernels 101 — full playlist (start here)](https://www.youtube.com/watch?v=TUQAyCNxFe4) ⭐
+### Triton 101 ← PRIMARY FOCUS ⭐
+- [Triton GPU Kernels 101 — full playlist](https://www.youtube.com/playlist?list=PLPefVKO3tDxOJLAmCA75uShbe1z_RNqkQ) ⭐ — start here
+  - [Lesson 1: Syllabus](https://www.youtube.com/watch?v=TUQAyCNxFe4)
+  - [Lesson 2: GPU Architecture Basics](https://www.youtube.com/watch?v=JD5V8qInVOs)
+  - [Lesson 4: Vector Addition](https://www.youtube.com/watch?v=fYMS4IglLgg)
+  - [Lesson 5: Fused Softmax](https://www.youtube.com/watch?v=ftknUZDQCPc)
+  - [Lesson 6: Matmul](https://www.youtube.com/watch?v=XAr_iVE8uUk)
+  - [Lesson 9: Flash Attention fwd pass](https://www.youtube.com/watch?v=6ap2QVWKFH0)
+  - [Lesson 10: Flash Attention bwd pass](https://www.youtube.com/watch?v=cygYBmB5ow8)
 - [Flash Attention derived from first principles with Triton](https://www.youtube.com/watch?v=zy8ChVd_oTM) ⭐
-- [Flash Attention fwd pass — Triton Kernels 101 Lesson 9](https://www.youtube.com/watch?v=6ap2QVWKFH0) ⭐
-- [Flash Attention bwd pass — Triton Kernels 101 Lesson 10](https://www.youtube.com/watch?v=cygYBmB5ow8)
-- [Fused Softmax — Triton Kernels 101 Lesson 5](https://www.youtube.com/watch?v=ftknUZDQCPc)
+- [FlashAttention Explained: Theory + Triton Implementation](https://www.youtube.com/watch?v=orKwx_FUyug)
 - [Practitioners Guide to Triton (Lecture 14)](https://www.youtube.com/watch?v=DdTsX6DQk24)
 - [GPU Programming with Triton Kernels — DevConf.US 2025](https://www.youtube.com/watch?v=sv4soasZK7U)
 - [Torch to Triton LLM Tutorial](https://www.youtube.com/watch?v=ZfjV_GTJLPI)
 - [GPU Memory Coalescing Explained — Warp-Level Optimization](https://www.youtube.com/watch?v=zdzg0m279zA)
 - [Memory Coalescing, Bank Conflicts, Data Staging](https://www.youtube.com/watch?v=4bYLFhMtAqw)
 - [Warp Scheduling and Divergence (Lecture 16)](https://www.youtube.com/watch?v=WClew-fqVkM)
-- [Getting Started with CUDA — NVIDIA GTC 2025](https://www.youtube.com/watch?v=GmNkYayuaA4)
+
+### CUDA 101
+- [Getting Started with CUDA for Python Programmers](https://www.youtube.com/watch?v=nOxKexn3iBo) ⭐ — best entry point for Python/ML devs
+- [CUDA Programming Course — High-Performance Computing with GPUs](https://www.youtube.com/watch?v=86FAWCzIe_4) — full course, theory + labs
+- [Getting Started with CUDA and Parallel Programming — NVIDIA GTC 2025](https://www.youtube.com/watch?v=GmNkYayuaA4) — official NVIDIA walkthrough
+- [CUDA Tutorials Playlist (Creel)](https://www.youtube.com/playlist?list=PLKK11Ligqititws0ZOoGk3SW-TZCar4dK) — thread hierarchy, shared mem, bank conflicts step by step
 
 ### Quantization
 - [LLM Quantization Explained: GPTQ, AWQ, QLoRA, GGUF and More](https://www.youtube.com/watch?v=WmvZwR4rKJg) — most comprehensive
@@ -1006,3 +1016,79 @@ flowchart TD
 
     FIX --> Fixes
 ```
+
+---
+
+## G12. CUDA 101 vs Triton 101
+
+### What Each Abstracts
+
+```mermaid
+block-beta
+  columns 3
+  A["You write"]:1 B["CUDA C/C++"]:1 C["Triton Python"]:1
+  D["Thread control"]:1 E["Every thread, idx by hand\nthreadIdx.x / blockIdx.x"]:1 F["Program = one tile\ntl.program_id(axis=0)"]:1
+  G["Memory"]:1 H["Manual __shared__\n__syncthreads()"]:1 I["Auto shared mem\ntl.load/store + masking"]:1
+  J["Vectorization"]:1 K["intrinsics or compiler hints"]:1 L["Implicit: tl.arange gives\nauto-vectorized blocks"]:1
+  M["Tensor Cores"]:1 N["wmma / mma PTX or cublas"]:1 O["tl.dot → auto Tensor Core\non FP16/BF16 aligned tiles"]:1
+  P["Compile"]:1 Q["nvcc → SASS (binary)"]:1 R["JIT via LLVM → PTX → SASS"]:1
+```
+
+### Mental Model
+
+```mermaid
+flowchart LR
+    subgraph CUDA ["CUDA — Thread-Level"]
+        direction TB
+        C1["Grid → Blocks → Threads\n(you index every thread)"]
+        C2["Shared mem: explicit alloc\n+ __syncthreads()"]
+        C3["Full control, maximum flexibility\nSteep learning curve"]
+        C1 --> C2 --> C3
+    end
+
+    subgraph Triton ["Triton — Tile-Level"]
+        direction TB
+        T1["Grid of programs (tiles)\n(you index each tile)"]
+        T2["Shared mem: automatic\nno sync needed"]
+        T3["Python syntax, JIT compiled\nFlash Attn in ~100 lines"]
+        T1 --> T2 --> T3
+    end
+
+    CUDA -- "same GPU\ndifferent abstraction" --> Triton
+```
+
+### Side-by-Side: Vector Add
+
+| Step | CUDA (C) | Triton (Python) |
+|------|----------|-----------------|
+| Launch | `kernel<<<grid, block>>>(...)` | `kernel[(N // BLOCK,)](...)` |
+| Thread ID | `int i = blockIdx.x * blockDim.x + threadIdx.x` | `offs = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)` |
+| Bounds check | `if (i < N)` | `mask = offs < N` |
+| Load | `float a = A[i]` | `a = tl.load(A_ptr + offs, mask=mask)` |
+| Store | `C[i] = a + b` | `tl.store(C_ptr + offs, a + b, mask=mask)` |
+| Shared mem | manual `__shared__` + sync | automatic |
+| Tensor Core | PTX `mma` / cublas | `tl.dot(a, b)` |
+
+### When to Use Which
+
+```mermaid
+flowchart TD
+    Q["Need a GPU kernel?"]
+    Q --> A["Have PyTorch + Triton?"]
+    A -->|yes| B["Use Triton first\n— faster iteration\n— Tensor Cores auto"]
+    A -->|no| C["Use CUDA C\n— max control\n— needed for drivers/libs"]
+    B --> D["Need sub-warp control?\n(e.g. custom warp shuffle)"]
+    D -->|yes| C
+    D -->|no| E["Ship the Triton kernel ✓"]
+```
+
+### CUDA Concepts You Still Need for Triton Interviews
+
+| Concept | Why it matters even in Triton |
+|---------|-------------------------------|
+| Warp = 32 threads | Triton BLOCK must be multiple of 32 or you waste lanes |
+| Memory coalescing | `tl.load` is coalesced only if `offs` are contiguous — you still design tile layout |
+| Shared mem bank conflicts | Triton's auto-shared can still have conflicts; add `+1` padding hint |
+| Occupancy | `triton.testing.do_bench` + `ncu` — same limiting factors apply |
+| Arithmetic intensity | Roofline analysis is language-agnostic — always applicable |
+| SM count / warp slots | Sets optimal grid size = `ceil(N / BLOCK)`, must fill all SMs |
