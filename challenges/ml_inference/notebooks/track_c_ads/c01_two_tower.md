@@ -1,0 +1,7 @@
+# C01 Two Tower
+
+**Track:** C — Ads ML Inference
+**Status:** Not Started
+
+> Session notes and Q\&A will be filled in during the teaching session.
+

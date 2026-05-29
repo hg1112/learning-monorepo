@@ -70,6 +70,7 @@ class ObservabilityTracker:
     def __init__(self):
         self.index = 0
         self.calls: List[ObservedCallRecord] = []
+        self.session_total = 0
 
     def __enter__(self):
         self.current_time = time()
@@ -87,11 +88,11 @@ class ObservabilityTracker:
 
     def _print_call(self, rec: ObservedCallRecord):
         sep = "|" + "-" * WIDTH + "|"
-        session_total = sum(
+        self.session_total = sum(
             r.input_tokens_cost + r.output_tokens_cost + r.cache_read_cost + r.cache_write_cost
             for r in self.calls
         )
-        last_line = f"Session total: ${session_total:.5f} | {len(self.calls)} calls"
+        last_line = f"Session total: ${self.session_total:.5f} | {len(self.calls)} calls"
         print(os.linesep.join([
             sep,
             str(rec),
