@@ -7,7 +7,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ## Track B — GPU Programming (foundation first)
 
 - [ ] B1 · GPU Architecture — thread hierarchy, memory hierarchy, warp scheduling
-- [ ] B2 · CUDA Basics (Numba) — vector add, matmul, shared memory
+- [x] B2 · CUDA Basics (Numba) — vector add, matmul, shared memory
 - [ ] B3 · Triton 101 — vector add → fused softmax → tiled matmul
 - [ ] B4 · Memory Coalescing, bank conflicts, occupancy tuning
 - [ ] B5 · Triton FlashAttention forward pass
