@@ -1,0 +1,62 @@
+name: "sum_ensemble"
+platform: "ensemble"
+max_batch_size: 8
+
+input [
+    {
+        name: "ENS_INPUT0"
+        data_type: TYPE_FP32
+        dims: [ 4 ]
+    },
+    {
+        name: "ENS_INPUT1"
+        data_type: TYPE_FP32
+        dims: [ 4 ]
+    }
+]
+
+output [
+    {
+        name: "ENS_OUTPUT0"
+        data_type: TYPE_FP32
+        dims: [ 4 ]
+    }
+]
+
+ensemble_scheduling {
+    step [
+        {
+            model_name: "identity_model"
+            model_version: -1
+            input_map {
+                key: "INPUT0" value: "ENS_INPUT0"
+            }
+            output_map {
+                key: "OUTPUT0" value: "OUTPUT0_ENS"
+            }
+        },
+        {
+            model_name: "identity_model"
+            model_version: -1
+            input_map {
+                key: "INPUT0" value: "ENS_INPUT1"
+            }
+            output_map {
+                key: "OUTPUT0" value: "OUTPUT1_ENS"
+            }
+        },
+        {
+            model_name: "python_add_model"
+            model_version: -1
+            input_map {
+                key: "INPUT0" value: "OUTPUT0_ENS"
+            }
+            input_map {
+                key: "INPUT1" value: "OUTPUT1_ENS"
+            }
+            output_map {
+                key: "OUTPUT0" value: "ENS_OUTPUT0"
+            }
+        }
+    ]
+}

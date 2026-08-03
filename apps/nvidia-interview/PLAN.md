@@ -50,12 +50,46 @@ memory). Relearn from scratch, don't assume.
   work.
 - Optimize for interview fluency over polish — code in `runpod/` doesn't need to be shareable.
 
+## Local environment (established Day 1, 2026-08-01)
+
+Single-GPU Triton work (model repository, config.pbtxt, backends, dynamic batching, versioning)
+runs on Harish's **local machine** (GTX 1660 Ti, driver 595.71.05, CUDA 13.2), not the Runpod
+pod — the pod is itself a container and doesn't support nested Docker, which made a bare-metal
+Triton install painful (chased missing `libcudart.so.13`, `libssl.so.1.1`, `libdcgm.so.4` one at
+a time before abandoning that path). Locally, Docker wasn't available either (aliases to Podman
+on this Ubuntu version) — Podman works fine instead:
+
+```bash
+podman run --rm --gpus all \
+  -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+  -v /home/karna/Desktop/learning-monorepo/apps/nvidia-interview/model_repository:/models \
+  nvcr.io/nvidia/tritonserver:26.07-py3 \
+  tritonserver --model-repository=/models
+```
+
+Gotchas hit once, don't need to re-debug:
+- Podman needs fully-qualified image names (`docker.io/nvidia/...`, not `nvidia/...`) — no
+  default search registries configured.
+- Rootless Podman's port forwarding doesn't proxy `::1` (IPv6) — `curl` tries IPv6 first by
+  default and gets "connection reset by peer". Use `curl -4` or `curl 127.0.0.1:...`.
+- `nvcr.io/nvidia/tritonserver:26.07-py3` matches driver's CUDA 13.2 and is confirmed working
+  end-to-end with GPU passthrough.
+
+Reserve the Runpod multi-GPU pod for when real multi-GPU is actually needed (Dynamo disaggregated
+serving, Day 4-5) — not for single-GPU Triton fundamentals.
+
+Test model used for hands-on: `identity_model` in `model_repository/`, using Triton's built-in
+`identity` backend (no model file needed, just `config.pbtxt`) — chosen specifically to avoid
+needing an ONNX/PyTorch export toolchain while learning repo structure/config. Note: `identity`
+is one of Triton's own internal test backends, so it enforces input/output names of the form
+`INPUT<n>`/`OUTPUT<n>` — a quirk of this backend, not a general Triton rule.
+
 ## Day-by-day (today = Jul 30, interview = Aug 11-12)
 
 | Day | Date | Focus |
 |---|---|---|
-| 1 | Jul 30 | Triton internals from scratch: model repository, `config.pbtxt`, dynamic batching, versioning. Start OSS issue #8874. |
-| 2 | Jul 31 | Triton backends (Python/C++), ensembles, `perf_analyzer` load testing. Finish/submit #8874 PR. |
+| 1 | Jul 30 (actually done 2026-08-01) | Triton internals from scratch: model repository ✅, `config.pbtxt` ✅ (validated end-to-end with a running server + real inference request). Still open: dynamic batching, versioning hands-on (multiple versions loaded side by side), OSS issue #8874 — pick up next session. |
+| 2 | Jul 31 (actually done 2026-08-02/03) | Triton backends (Python/C++) ✅, ensembles ✅, `perf_analyzer` ✅ — all built and hands-on validated. #8874 PR already opened Day 1. |
 | 3 | Aug 1 | Dynamo internals: disaggregated prefill/decode, planner architecture. Start OSS issue #12296. |
 | 4 | Aug 2 | Dynamo internals: KV-cache routing, NIXL/UCX transport. |
 | 5 | Aug 3 | Runpod hands-on: real multi-GPU disaggregated serving run with Dynamo. |
@@ -72,9 +106,10 @@ memory). Relearn from scratch, don't assume.
 Tracked in `experiments/open-source/weekly_candidates.md` (2026-07-30 entry). Picks:
 
 1. **[triton-inference-server/server#8874](https://github.com/triton-inference-server/server/issues/8874)** —
-   PT2/AOTI PyTorch backend swaps two timestamp args, corrupting latency stats. Reporter
-   diagnosed the exact fix (`pytorch_backend/src/pt2/model_instance_state.cc`). Tiny, scoped,
-   good odds of merging before the interview.
+   PT2/AOTI PyTorch backend swaps two timestamp args, corrupting latency stats. ✅ **PR opened
+   2026-08-02**: [triton-inference-server/pytorch_backend#203](https://github.com/triton-inference-server/pytorch_backend/pull/203).
+   Fix lives in the separate `pytorch_backend` repo, not `server` — cross-repo issue ref, won't
+   auto-close. Watch for review/CI feedback.
 2. **[ai-dynamo/dynamo#12296](https://github.com/ai-dynamo/dynamo/issues/12296)** — opt-in
    graceful shutdown hooks for the `dynamo_worker` Python decorator. Maintainer sketched the
    API shape. Python-facing, not core Rust.

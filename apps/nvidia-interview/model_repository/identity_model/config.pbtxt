@@ -1,0 +1,33 @@
+name: "identity_model"
+backend: "identity"
+max_batch_size : 8
+
+parameters: {
+key: "execute_delay_ms"
+value: { string_value: "1000" }
+}
+
+version_policy: {
+    all : {}
+}
+
+dynamic_batching {
+    preferred_batch_size: [4, 8]
+    max_queue_delay_microseconds: 100000
+}
+
+input [
+{
+        name : "INPUT0"
+        data_type: TYPE_FP32
+        dims: [ 4 ]
+}
+]
+
+output [
+{
+        name: "OUTPUT0"
+        data_type: TYPE_FP32
+        dims: [ 4 ]
+}
+]
